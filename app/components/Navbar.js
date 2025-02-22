@@ -5,7 +5,11 @@ import Link from 'next/link';
 import styled from 'styled-components';
 
 const NavContainer = styled.nav`
-  background-color: white;
+  background: linear-gradient(135deg, 
+    #6b21a8 0%,    /* Purple 800 */
+    #7e22ce 50%,   /* Purple 700 */
+    #9333ea 100%   /* Purple 600 */
+  );
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   position: fixed;
   width: 100%;
@@ -45,13 +49,13 @@ const LogoText = styled.div`
 const BrandPrimary = styled.span`
   font-size: 1.5rem;
   font-weight: bold;
-  color: #6D28D9;
+  color: white;
 `;
 
 const BrandSecondary = styled.span`
   font-size: 1.5rem;
   font-weight: bold;
-  color: #312E81;
+  color: rgba(255, 255, 255, 0.9);
 `;
 
 const DesktopMenu = styled.div`
@@ -59,36 +63,82 @@ const DesktopMenu = styled.div`
   @media (min-width: 768px) {
     display: flex;
     margin-left: 1.5rem;
-    gap: 2rem;
+    gap: 1rem;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.1);
+    padding: 0.5rem;
+    border-radius: 1rem;
+    backdrop-filter: blur(10px);
   }
 `;
 
 const StyledLink = styled(Link)`
-  color: #374151;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.375rem;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
   font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
-  transition: color 0.3s;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent
+    );
+    transition: 0.5s;
+  }
 
   &:hover {
-    color: #6D28D9;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+
+    &::before {
+      left: 100%;
+    }
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  &.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
   }
 `;
 
 const LoginButton = styled.button`
-  background-color: #6D28D9;
-  color: white;
+  background-color: white;
+  color: #6D28D9;
   padding: 0.5rem 1.5rem;
   border-radius: 9999px;
   font-weight: 500;
-  transition: background-color 0.3s;
+  transition: all 0.3s;
   border: none;
   cursor: pointer;
 
   &:hover {
-    background-color: #5B21B6;
+    background-color: rgba(255, 255, 255, 0.9);
+    transform: translateY(-1px);
   }
 `;
 
@@ -106,14 +156,13 @@ const MobileMenuButton = styled.button`
   justify-content: center;
   padding: 0.5rem;
   border-radius: 0.375rem;
-  color: #374151;
+  color: white;
   border: none;
   background: none;
   cursor: pointer;
 
   &:hover {
-    color: #6D28D9;
-    background-color: #F5F3FF;
+    background-color: rgba(255, 255, 255, 0.1);
   }
 
   @media (min-width: 768px) {
@@ -123,6 +172,7 @@ const MobileMenuButton = styled.button`
 
 const MobileMenu = styled.div`
   display: ${props => props.$isOpen ? 'block' : 'none'};
+  background-color: #6b21a8;
   @media (min-width: 768px) {
     display: none;
   }
@@ -137,7 +187,7 @@ const MobileMenuContent = styled.div`
 
 const MobileLink = styled(Link)`
   display: block;
-  color: #374151;
+  color: rgba(255, 255, 255, 0.9);
   padding: 0.5rem 0.75rem;
   border-radius: 0.375rem;
   font-size: 1rem;
@@ -146,7 +196,8 @@ const MobileLink = styled(Link)`
   margin-bottom: 0.5rem;
 
   &:hover {
-    color: #6D28D9;
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
   }
 `;
 
@@ -157,6 +208,7 @@ const MobileLoginButton = styled(LoginButton)`
 
 const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [activeTab, setActiveTab] = useState('/');
 
     return (
         <NavContainer>
@@ -171,11 +223,11 @@ const Navbar = () => {
                         </LogoWrapper>
 
                         <DesktopMenu>
-                            <StyledLink href="/">Home</StyledLink>
-                            <StyledLink href="/service">Service</StyledLink>
-                            <StyledLink href="/activity">Activity</StyledLink>
-                            <StyledLink href="/account">Account</StyledLink>
-                            <StyledLink href="/about">About Us</StyledLink>
+                            <StyledLink href="/" className={activeTab === '/' ? 'active' : ''} onClick={() => setActiveTab('/')}>Home</StyledLink>
+                            <StyledLink href="/service" className={activeTab === '/service' ? 'active' : ''} onClick={() => setActiveTab('/service')}>Service</StyledLink>
+                            <StyledLink href="/activity" className={activeTab === '/activity' ? 'active' : ''} onClick={() => setActiveTab('/activity')}>Activity</StyledLink>
+                            <StyledLink href="/account" className={activeTab === '/account' ? 'active' : ''} onClick={() => setActiveTab('/account')}>Account</StyledLink>
+                            <StyledLink href="/about" className={activeTab === '/about' ? 'active' : ''} onClick={() => setActiveTab('/about')}>About Us</StyledLink>
                         </DesktopMenu>
                     </LogoContainer>
 
