@@ -18,7 +18,15 @@ export default function AccountPage() {
     phoneNumber: "",
     profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=John",
     joinDate: "",
-    totalRides: 0
+    totalRides: 0,
+    walletBalance: 0,
+    transactions: [], // Initialize empty transactions array
+    messages: [], // Initialize empty messages array
+    preferences: {
+      notifications: false,
+      emailUpdates: false,
+      darkMode: false
+    }
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -33,7 +41,11 @@ export default function AccountPage() {
   const [newPhoneNumber, setNewPhoneNumber] = useState('');
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
   const [phoneUpdateError, setPhoneUpdateError] = useState('');
-  
+  const [loginHistory, setLoginHistory] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [loginHistoryError, setLoginHistoryError] = useState(null);
+  const [showLoginHistoryModal, setShowLoginHistoryModal] = useState(false);
+
   // Fetch user data
   const fetchUserData = async () => {
     try {
@@ -45,6 +57,10 @@ export default function AccountPage() {
       setUserData(prev => ({
         ...prev,
         ...data,
+        preferences: {
+          ...prev.preferences,
+          ...(data.preferences || {})
+        },
         // Format the date
         joinDate: new Date(data.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
       }));
@@ -674,6 +690,56 @@ export default function AccountPage() {
     </div>
   );
 
+  const renderAddressSection = () => {
+    if (savedAddresses.length === 0) {
+      return (
+        <div className="text-center py-6 bg-purple-50 rounded-xl">
+          <p className="text-gray-500">No addresses saved yet</p>
+        </div>
+      );
+    }
+
+    return savedAddresses.map((address) => (
+      <div key={address._id} className="bg-white rounded-xl p-6 border border-gray-100">
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <h3 className="text-lg font-semibold text-gray-900">{address.label}</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => handleEditAddress(address)}
+              className="text-purple-600 hover:text-purple-700"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+            <button 
+              onClick={() => handleDeleteAddress(address._id)}
+              className="text-red-600 hover:text-red-700"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div className="space-y-1 text-sm text-gray-600">
+          <p>{address.streetAddress}</p>
+          <p>{address.city}, {address.state} - {address.pincode}</p>
+          {address.landmark && <p>Landmark: {address.landmark}</p>}
+          {address.instructions && (
+            <p className="text-gray-500 italic mt-2">{address.instructions}</p>
+          )}
+        </div>
+      </div>
+    ));
+  };
+
   const renderSection = () => {
     if (loading) {
       return (
@@ -783,7 +849,7 @@ export default function AccountPage() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-purple-200">Available Balance</p>
-                  <h2 className="text-3xl font-bold">₹{userData.walletBalance}</h2>
+                  <h2 className="text-3xl font-bold">₹{userData.walletBalance || 0}</h2>
                 </div>
                 <button className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 transition-colors duration-300 font-medium shadow-sm hover:shadow flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -795,12 +861,12 @@ export default function AccountPage() {
               <div className="grid grid-cols-2 gap-4 mt-6">
                 <div className="bg-white bg-opacity-10 rounded-xl p-4">
                   <p className="text-purple-200 text-sm">This Month</p>
-                  <p className="text-xl font-semibold mt-1">₹1,200</p>
+                  <p className="text-xl font-semibold mt-1">₹0</p>
                   <p className="text-purple-200 text-sm mt-1">Total Spent</p>
                 </div>
                 <div className="bg-white bg-opacity-10 rounded-xl p-4">
                   <p className="text-purple-200 text-sm">Cashback Earned</p>
-                  <p className="text-xl font-semibold mt-1">₹150</p>
+                  <p className="text-xl font-semibold mt-1">₹0</p>
                   <p className="text-purple-200 text-sm mt-1">This Month</p>
                 </div>
               </div>
@@ -811,49 +877,57 @@ export default function AccountPage() {
                 <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
               </div>
               <div className="divide-y divide-gray-100">
-                {userData.transactions.map(transaction => (
-                  <div key={transaction.id} className="p-4 hover:bg-gray-50 transition-colors duration-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${
-                          transaction.type === 'credit' 
-                            ? 'bg-green-100 text-green-600'
-                            : 'bg-red-100 text-red-600'
-                        }`}>
-                          {transaction.type === 'credit' ? (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 11l5-5m0 0l5 5m-5-5v12" />
-                            </svg>
-                          ) : (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
-                            </svg>
-                          )}
+                {userData.transactions && userData.transactions.length > 0 ? (
+                  userData.transactions.map(transaction => (
+                    <div key={transaction.id} className="p-4 hover:bg-gray-50 transition-colors duration-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-full ${
+                            transaction.type === 'credit' 
+                              ? 'bg-green-100 text-green-600'
+                              : 'bg-red-100 text-red-600'
+                          }`}>
+                            {transaction.type === 'credit' ? (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                              </svg>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{transaction.description}</p>
+                            <p className="text-sm text-gray-500">{transaction.date}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{transaction.description}</p>
-                          <p className="text-sm text-gray-500">{transaction.date}</p>
+                        <div className="text-right">
+                          <p className={`font-medium ${
+                            transaction.type === 'credit'
+                              ? 'text-green-600'
+                              : 'text-red-600'
+                          }`}>
+                            {transaction.type === 'credit' ? '+' : '-'}₹{transaction.amount}
+                          </p>
+                          <p className="text-sm text-gray-500 capitalize">{transaction.status}</p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-medium ${
-                          transaction.type === 'credit'
-                            ? 'text-green-600'
-                            : 'text-red-600'
-                        }`}>
-                          {transaction.type === 'credit' ? '+' : '-'}₹{transaction.amount}
-                        </p>
-                        <p className="text-sm text-gray-500 capitalize">{transaction.status}</p>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-gray-500">
+                    No transactions yet
                   </div>
-                ))}
+                )}
               </div>
-              <div className="p-4 border-t border-gray-100">
-                <button className="w-full px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors duration-200 font-medium">
-                  View All Transactions
-                </button>
-              </div>
+              {userData.transactions && userData.transactions.length > 0 && (
+                <div className="p-4 border-t border-gray-100">
+                  <button className="w-full px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors duration-200 font-medium">
+                    View All Transactions
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -862,52 +936,51 @@ export default function AccountPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-gray-900">Messages</h2>
-              <button className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center gap-2">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
-                </svg>
-                Mark All as Read
-              </button>
+              {userData.messages && userData.messages.some(m => m.unread) && (
+                <button className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
+                  </svg>
+                  Mark All as Read
+                </button>
+              )}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 divide-y divide-gray-100">
-              {userData.messages.map(message => (
-                <div key={message.id} className="p-4 hover:bg-gray-50 transition-colors duration-200">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-full ${message.unread ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-gray-900">{message.sender}</p>
-                          {message.unread && (
-                            <span className="w-2 h-2 bg-purple-600 rounded-full"></span>
-                          )}
+              {userData.messages && userData.messages.length > 0 ? (
+                userData.messages.map(message => (
+                  <div key={message.id} className="p-4 hover:bg-gray-50 transition-colors duration-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-full ${message.unread ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`}>
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                          </svg>
                         </div>
-                        <p className="text-gray-600 mt-1">{message.message}</p>
-                        <p className="text-sm text-gray-500 mt-1">{message.time}</p>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900">{message.sender}</p>
+                            {message.unread && (
+                              <span className="w-2 h-2 bg-purple-600 rounded-full"></span>
+                            )}
+                          </div>
+                          <p className="text-gray-600 mt-1">{message.message}</p>
+                          <p className="text-sm text-gray-500 mt-1">{message.time}</p>
+                        </div>
                       </div>
+                      <button className="text-gray-400 hover:text-gray-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </button>
                     </div>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                      </svg>
-                    </button>
                   </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-gray-500">
+                  No messages yet
                 </div>
-              ))}
-            </div>
-
-            <div className="flex justify-center">
-              <button className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center gap-2">
-                View All Messages
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+              )}
             </div>
           </div>
         );
@@ -1255,204 +1328,222 @@ export default function AccountPage() {
       case 'security':
         return (
           <div className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">Security Settings</h2>
+              <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
+                Last Updated: {new Date().toLocaleDateString()}
+              </span>
+            </div>
+
             <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Password & Security</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium text-gray-900">Password</h4>
-                    <p className="text-sm text-gray-600">Last changed: 30 days ago</p>
+              <div className="space-y-6">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 bg-purple-100 rounded-lg">
+                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
                   </div>
-                  <button
-                    onClick={() => setShowPasswordModal(true)}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
-                  >
-                    Change Password
-                  </button>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Password & Authentication</h3>
+                    <p className="text-gray-600">Manage your password and account security</p>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
-                  <div>
-                    <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
-                    <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
+
+                <div className="space-y-4">
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900">Password</h4>
+                        <p className="text-sm text-gray-600">Change your account password</p>
+                      </div>
+                      <button
+                        onClick={() => setShowPasswordModal(true)}
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 flex items-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                        Change Password
+                      </button>
+                    </div>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                  </label>
+
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
+                        <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" className="sr-only peer" />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium text-gray-900">Login History</h4>
+                        <p className="text-sm text-gray-600">View your recent login activity</p>
+                      </div>
+                      <button 
+                        onClick={() => setShowLoginHistoryModal(true)}
+                        className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center gap-2"
+                      >
+                        View History
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                    {isLoadingHistory ? (
+                      <div className="flex justify-center mt-4">
+                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-purple-700"></div>
+                      </div>
+                    ) : loginHistory.length > 0 && (
+                      <div className="mt-4 space-y-3">
+                        {loginHistory.slice(0, 3).map((entry, index) => (
+                          <div key={index} className="flex items-center justify-between bg-white rounded-lg p-3">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full ${
+                                entry.status === 'success' ? 'bg-green-500' : 'bg-red-500'
+                              }`}></div>
+                              <span className="text-sm text-gray-600">
+                                {new Date(entry.timestamp).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <span className="text-sm text-gray-500">{entry.deviceInfo}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-100">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-sm text-yellow-800">
+                      For enhanced security, we recommend enabling two-factor authentication and using a strong, unique password.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {showPasswordModal && <PasswordChangeModal />}
+            {showLoginHistoryModal && <LoginHistoryModal />}
           </div>
         );
       case 'legal':
         return (
           <div className="space-y-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Legal Information</h2>
-              <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
-                Last Updated: March 2024
-              </span>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-purple-50 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Terms of Service</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-purple-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-gray-600">By using our service, you agree to comply with and be bound by our terms and conditions.</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-purple-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-gray-600">Users must be 18 years or older to use the service.</p>
-                  </div>
-                  <button className="mt-4 text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center gap-2">
-                    View Full Terms of Service
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
+            <h2 className="text-2xl font-bold text-gray-900">Legal</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900">Terms of Service</h3>
+                <p className="text-gray-600">Read our terms of service carefully before using our services.</p>
               </div>
-
-              <div className="bg-purple-50 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Privacy Policy</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-purple-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-gray-600">We collect and process your data in accordance with GDPR and applicable privacy laws.</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-purple-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-gray-600">Your personal information is encrypted and securely stored.</p>
-                  </div>
-                  <button className="mt-4 text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center gap-2">
-                    View Full Privacy Policy
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-purple-50 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Licenses & Registrations</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-purple-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-gray-600">All our drivers are licensed and verified according to local transportation laws.</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-purple-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-gray-600">Our service complies with all transportation and ride-sharing regulations.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-purple-50 rounded-xl p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Dispute Resolution</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-purple-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-gray-600">Any disputes will be resolved through our customer support system first.</p>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <svg className="w-5 h-5 text-purple-600 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-gray-600">Legal proceedings shall be conducted in accordance with local jurisdiction laws.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg p-4 border border-purple-100">
-                <div className="flex items-center gap-3">
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="text-sm text-gray-600">
-                    For any legal inquiries, please contact our legal team at <span className="font-medium text-purple-700">legal@ride90.com</span>
-                  </p>
-                </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900">Privacy Policy</h3>
+                <p className="text-gray-600">Learn about how we handle your personal information and data.</p>
               </div>
             </div>
           </div>
         );
-      default:
-        return null;
     }
   };
 
-  const renderAddressSection = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Saved Addresses</h3>
-        <button 
-          onClick={() => setShowAddAddressModal(true)}
-          className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center gap-1"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Add New
-        </button>
-      </div>
-      <div className="space-y-3">
-        {savedAddresses.map(address => (
-          <div key={address._id} className="bg-purple-50 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900">{address.label}</span>
-                {address.isDefault && (
-                  <span className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs">Default</span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => handleEditAddress(address)}
-                  className="text-purple-600 hover:text-purple-700"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-                <button 
-                  onClick={() => handleDeleteAddress(address._id)}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="space-y-1 text-sm text-gray-600">
-              <p>{address.streetAddress}</p>
-              <p>{address.city}, {address.state} - {address.pincode}</p>
-              {address.landmark && <p>Landmark: {address.landmark}</p>}
-              {address.instructions && (
-                <p className="text-gray-500 italic mt-2">{address.instructions}</p>
-              )}
-            </div>
+  const fetchLoginHistory = async () => {
+    try {
+      setIsLoadingHistory(true);
+      setLoginHistoryError(null);
+      const response = await fetch('/api/user/login-history');
+      if (!response.ok) {
+        throw new Error('Failed to fetch login history');
+      }
+      const data = await response.json();
+      setLoginHistory(data);
+    } catch (error) {
+      console.error('Error fetching login history:', error);
+      setLoginHistoryError('Failed to load login history');
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection === 'security') {
+      fetchLoginHistory();
+    }
+  }, [activeSection]);
+
+  const LoginHistoryModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 w-full max-w-2xl">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-semibold text-gray-900">Login History</h3>
+          <button 
+            onClick={() => setShowLoginHistoryModal(false)}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        {isLoadingHistory ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-700"></div>
           </div>
-        ))}
-        {savedAddresses.length === 0 && (
-          <div className="text-center py-6 bg-purple-50 rounded-xl">
-            <p className="text-gray-500">No addresses saved yet</p>
+        ) : loginHistoryError ? (
+          <div className="text-center py-8">
+            <p className="text-red-600">{loginHistoryError}</p>
+            <button
+              onClick={fetchLoginHistory}
+              className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {loginHistory.map((entry, index) => (
+              <div key={index} className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-full ${
+                      entry.status === 'success' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                    }`}>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        {entry.status === 'success' ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        )}
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {entry.status === 'success' ? 'Successful Login' : 'Failed Attempt'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right text-sm text-gray-500">
+                    <p>{entry.deviceInfo}</p>
+                    <p>{entry.ipAddress}</p>
+                    {entry.location && <p>{entry.location}</p>}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
