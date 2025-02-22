@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import WalletSection from './wallet/page';
 
 export default function Home() {
   const router = useRouter();
@@ -287,6 +288,8 @@ export default function Home() {
           </div>
         </div>
       </div>
-   
+
+      <WalletSection />
+    </div>
   );
 }
