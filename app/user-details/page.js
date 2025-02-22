@@ -123,6 +123,45 @@ const Button = styled(motion.button)`
   }
 `;
 
+const Select = styled.select`
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid ${props => props.error ? '#ff6b6b' : 'rgba(255, 255, 255, 0.2)'};
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  outline: none;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  appearance: none;
+  padding-right: 2rem;
+
+  &:focus {
+    border-color: #9f7aea;
+    box-shadow: 0 0 0 3px rgba(159, 122, 234, 0.2);
+  }
+
+  option {
+    background: #4a148c;
+    color: white;
+  }
+`;
+
+const SelectWrapper = styled.div`
+  position: relative;
+  
+  &::after {
+    content: '▼';
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    font-size: 0.8rem;
+  }
+`;
+
 export default function UserDetailsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -138,6 +177,7 @@ export default function UserDetailsPage() {
     zipCode: '',
     occupation: '',
     dateOfBirth: '',
+    gender: '',
   });
 
   useEffect(() => {
@@ -151,6 +191,10 @@ export default function UserDetailsPage() {
     
     if (!formData.fullName) {
       newErrors.fullName = 'Full name is required';
+    }
+    
+    if (!formData.gender) {
+      newErrors.gender = 'Please select your gender';
     }
     
     if (!formData.phoneNumber) {
@@ -286,6 +330,32 @@ export default function UserDetailsPage() {
               placeholder="Enter your full name"
             />
             {errors.fullName && <ErrorMessage>{errors.fullName}</ErrorMessage>}
+          </InputGroup>
+
+          <InputGroup>
+            <Label>Gender</Label>
+            <SelectWrapper>
+              <Select
+                name="gender"
+                value={formData.gender}
+                onChange={handleChange}
+                error={errors.gender}
+              >
+                <option value="">Select gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+                <option value="prefer_not_to_say">Prefer not to say</option>
+              </Select>
+            </SelectWrapper>
+            {errors.gender && (
+              <ErrorMessage
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                {errors.gender}
+              </ErrorMessage>
+            )}
           </InputGroup>
 
           <InputGroup>
