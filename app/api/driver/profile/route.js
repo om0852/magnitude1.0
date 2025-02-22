@@ -1,4 +1,3 @@
-// import { connectToDatabase } from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import Driver from '../../../models/Driver';
