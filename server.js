@@ -251,20 +251,6 @@ io.on("connection", (socket) => {
       requestId: `REQ${Date.now()}${Math.random().toString(36).substr(2, 4)}`
     };
 
-    tripRequests.set(socket.id, fullTripRequest);
-    console.log("Stored trip request:", fullTripRequest);
-
-    // Find the best available driver
-    const bestDriver = findBestDriver(tripRequest);
-    console.log("Best driver found:", bestDriver);
-
-    if (!bestDriver) {
-      console.log("No drivers available");
-      socket.emit("noDriversAvailable");
-      tripRequests.delete(socket.id);
-      return;
-    }
-
     // Generate a unique ride ID
     const rideId = `RIDE${Date.now()}${Math.random().toString(36).substr(2, 4)}`;
     
@@ -287,6 +273,23 @@ io.on("connection", (socket) => {
     };
 
     console.log("Created ride request:", rideRequest);
+
+    // Store the updated trip request with rideId
+    tripRequests.set(socket.id, {
+      ...fullTripRequest,
+      rideId: rideId  // Add the rideId to the stored request
+    });
+
+    // Find the best available driver
+    const bestDriver = findBestDriver(tripRequest);
+    console.log("Best driver found:", bestDriver);
+
+    if (!bestDriver) {
+      console.log("No drivers available");
+      socket.emit("noDriversAvailable");
+      tripRequests.delete(socket.id);
+      return;
+    }
 
     // Send the ride request to the selected driver
     const driverSocket = io.sockets.sockets.get(bestDriver.socketId);
@@ -315,12 +318,17 @@ io.on("connection", (socket) => {
     console.log("Ride accepted by driver:", response);
     const { rideId, driverId, driverName, vehicleNumber, contactNumber } = response;
     
+    console.log("Current tripRequests:", Array.from(tripRequests.entries()));
+    console.log("Looking for rideId:", rideId);
+    
     // Find the user who requested the ride
-    const userSocket = Array.from(tripRequests.entries())
+    const userSocketEntry = Array.from(tripRequests.entries())
       .find(([_, request]) => request.rideId === rideId);
 
-    if (userSocket) {
-      const [userId, request] = userSocket;
+    console.log("Found userSocketEntry:", userSocketEntry);
+
+    if (userSocketEntry && Array.isArray(userSocketEntry)) {
+      const [userId, request] = userSocketEntry;
       const user = io.sockets.sockets.get(request.socketId);
       
       if (user) {
@@ -464,4 +472,4 @@ io.on("connection", (socket) => {
 
 server.listen(5000, () => {
   console.log("Server running on port 5000");
-}); 
+}); 88

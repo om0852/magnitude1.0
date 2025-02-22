@@ -8,8 +8,8 @@ export async function GET(request, { params }) {
     await connectDB();
     const { rideId } = params;
 
-    // Fetch ride with driver details
-    const ride = await Ride.findById(rideId).lean();
+    // Fetch ride with driver details using rideId field instead of _id
+    const ride = await Ride.findOne({ rideId }).lean();
     
     if (!ride) {
       return NextResponse.json(
@@ -24,8 +24,8 @@ export async function GET(request, { params }) {
       const driver = await Driver.findById(ride.driverId).lean();
       if (driver) {
         driverDetails = {
-          name: driver.name,
-          contactNumber: driver.contactNumber,
+          name: driver.fullName,
+          contactNumber: driver.phone,
           vehicleNumber: driver.vehicleNumber,
           vehicleModel: driver.vehicleModel,
           rating: driver.rating || 4.5,

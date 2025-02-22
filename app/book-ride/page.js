@@ -1119,7 +1119,13 @@ export default function BookRide() {
       duration: routeDetails?.duration || 0
     });
 
-    toast.info('Searching for nearby drivers...');
+    toast('Searching for nearby drivers...', {
+      icon: 'ℹ️',
+      style: {
+        background: '#3b82f6',
+        color: '#ffffff',
+      },
+    });
   };
 
   const handleCancelTrip = () => {

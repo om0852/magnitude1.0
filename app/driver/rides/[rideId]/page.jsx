@@ -2,6 +2,7 @@
 
 import { useState, useEffect, use } from 'react';
 import axios from 'axios';
+import io from 'socket.io-client';
 
 const RideDetails = ({ params }) => {
   const { rideId } = use(params);
@@ -9,11 +10,56 @@ const RideDetails = ({ params }) => {
   const [otpInput, setOtpInput] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [socket, setSocket] = useState(null);
 
   useEffect(() => {
     console.log('RideId from params:', rideId);
     fetchRideDetails();
   }, []);
+
+  // Initialize socket connection
+  useEffect(() => {
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, []);
+
+  // Track and emit driver location
+  useEffect(() => {
+    if (!socket || !rideId) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const driverLocation = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          rideId: rideId,
+          timestamp: new Date().toISOString()
+        };
+
+        // Emit driver location update
+        socket.emit('driverLocationUpdate', driverLocation);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+
+    // Cleanup
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [socket, rideId]);
 
   const fetchRideDetails = async () => {
     try {

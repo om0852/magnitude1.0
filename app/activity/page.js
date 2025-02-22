@@ -1,261 +1,366 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { getSession } from 'next-auth/react';
+import styled from 'styled-components';
+import { FaCar, FaMapMarkerAlt, FaClock, FaMoneyBillWave, FaStar } from 'react-icons/fa';
+import axios from 'axios';
 
-export default function ActivityPage() {
+const PageContainer = styled.div`
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, #f8fafc, #f1f5f9);
+  padding: 2rem;
+`;
+
+const ContentWrapper = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+`;
+
+const Header = styled.div`
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+  h1 {
+    font-size: 2rem;
+    color: #4C1D95;
+    margin-bottom: 0.5rem;
+  }
+
+  p {
+    color: #6B7280;
+  }
+`;
+
+const TabContainer = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+`;
+
+const Tab = styled.button`
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  border: none;
+  background: ${props => props.active ? '#6D28D9' : 'transparent'};
+  color: ${props => props.active ? 'white' : '#4B5563'};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+
+  &:hover {
+    background: ${props => props.active ? '#5B21B6' : '#F3F4F6'};
+  }
+`;
+
+const TripCard = styled.div`
+  background: white;
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease;
+  border: 1px solid #E5E7EB;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+`;
+
+const TripHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #E5E7EB;
+
+  .trip-id {
+    font-size: 0.875rem;
+    color: #6B7280;
+  }
+
+  .trip-status {
+    padding: 0.5rem 1rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    
+    &.upcoming {
+      background: #DBEAFE;
+      color: #1E40AF;
+    }
+    
+    &.ongoing {
+      background: #DEF7EC;
+      color: #046C4E;
+    }
+    
+    &.completed {
+      background: #E5E7EB;
+      color: #374151;
+    }
+  }
+`;
+
+const LocationInfo = styled.div`
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+
+  .location-details {
+    flex: 1;
+
+    .location-type {
+      font-size: 0.875rem;
+      color: #6B7280;
+      margin-bottom: 0.25rem;
+    }
+
+    .address {
+      color: #111827;
+      font-weight: 500;
+    }
+  }
+`;
+
+const TripDetails = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  padding: 1rem 0;
+  border-top: 1px solid #E5E7EB;
+
+  .detail-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #4B5563;
+
+    svg {
+      color: #6D28D9;
+    }
+
+    .label {
+      font-size: 0.875rem;
+      color: #6B7280;
+    }
+
+    .value {
+      font-weight: 600;
+      color: #111827;
+    }
+  }
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  padding: 3rem;
+  background: white;
+  border-radius: 1rem;
+  color: #6B7280;
+
+  svg {
+    width: 4rem;
+    height: 4rem;
+    margin-bottom: 1rem;
+    color: #D1D5DB;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+    color: #374151;
+    margin-bottom: 0.5rem;
+  }
+`;
+
+export default function Activity() {
+  const { data: session, status } = useSession();
   const router = useRouter();
-  const [selectedRide, setSelectedRide] = useState(null);
-  const [activeTab, setActiveTab] = useState('upcoming');
-  const [isContentVisible, setIsContentVisible] = useState(true);
-  const [rides, setRides] = useState({
-    upcoming: [],
-    current: [],
-    past: []
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('all');
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch user rides data
-  const fetchUserRides = async () => {
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+
+    fetchTrips();
+  }, [status, router]);
+
+  const fetchTrips = async () => {
     try {
-      const session = await getSession();
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-
-      const response = await fetch('/api/rides');
-      if (!response.ok) {
-        throw new Error('Failed to fetch rides');
-      }
-
-      const data = await response.json();
-      
-      // Categorize rides based on their status and dates
-      const now = new Date();
-      const categorizedRides = {
-        upcoming: data.filter(ride => new Date(ride.date) > now && ride.status !== 'cancelled'),
-        current: data.filter(ride => ride.status === 'in_progress'),
-        past: data.filter(ride => new Date(ride.date) < now || ride.status === 'completed')
-      };
-
-      setRides(categorizedRides);
-      setIsLoading(false);
+      setLoading(true);
+      const response = await axios.get('/api/trips');
+      setTrips(response.data.data);
     } catch (error) {
-      console.error('Error fetching rides:', error);
-      setError('Failed to load rides. Please try again later.');
-      setIsLoading(false);
+      console.error('Error fetching trips:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchUserRides();
-  }, []);
-
-  // Handle tab change with animation
-  const handleTabChange = (tab) => {
-    setIsContentVisible(false);
-    setTimeout(() => {
-      setActiveTab(tab);
-      setIsContentVisible(true);
-    }, 300);
+  const filterTrips = (status) => {
+    if (status === 'all') return trips;
+    return trips.filter(trip => {
+      if (status === 'upcoming') return trip.status === 'pending';
+      if (status === 'ongoing') return trip.status === 'in_progress';
+      if (status === 'past') return trip.status === 'completed';
+      return true;
+    });
   };
 
-  const handleRideClick = (ride) => {
-    router.push(`/activity/trip/${ride.id}`);
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  const RideCard = ({ ride, type, index }) => (
-    <div 
-      onClick={() => handleRideClick(ride)}
-      className="bg-white rounded-xl p-6 cursor-pointer transition-all duration-300 hover:shadow-lg border border-gray-100 hover:border-indigo-100 group"
-      style={{
-        animation: `slideIn 0.5s ease-out forwards`,
-        animationDelay: `${index * 0.1}s`,
-        opacity: 0,
-      }}
-    >
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="text-xl font-semibold text-gray-800 group-hover:text-indigo-700">
-            {ride.pickup} to {ride.destination}
-          </h3>
-          <p className="text-sm text-gray-500">{new Date(ride.date).toLocaleDateString()} - {ride.time}</p>
-        </div>
-        {ride.status && (
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            ride.status === "in_progress" 
-              ? "bg-blue-50 text-blue-700" 
-              : ride.status === "completed"
-              ? "bg-green-50 text-green-700"
-              : "bg-yellow-50 text-yellow-700"
-          }`}>
-            {ride.status.replace('_', ' ').charAt(0).toUpperCase() + ride.status.slice(1)}
-          </span>
-        )}
-      </div>
-      <div className="space-y-3 text-gray-600">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <p>From: {ride.pickup}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-          </svg>
-          <p>To: {ride.destination}</p>
-        </div>
-        {ride.driver && (
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <p>Driver: {ride.driver}</p>
-          </div>
-        )}
-        {ride.fare && (
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p>Fare: ₹{ride.fare}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  const getStatusClass = (status) => {
+    switch (status) {
+      case 'pending': return 'upcoming';
+      case 'in_progress': return 'ongoing';
+      case 'completed': return 'completed';
+      default: return '';
+    }
+  };
 
-  const TabButton = ({ tab, label }) => (
-    <button
-      onClick={() => handleTabChange(tab)}
-      className={`px-8 py-4 text-base font-medium rounded-t-xl transition-all duration-300 ${
-        activeTab === tab
-          ? 'bg-white text-purple-700 shadow-lg border-t-2 border-purple-500 transform -translate-y-1 hover:shadow-xl'
-          : 'text-gray-600 hover:text-purple-600 hover:bg-white/10 hover:shadow-md'
-      }`}
-    >
-      {label}
-    </button>
-  );
-
-  // Loading state
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="min-h-screen trustworthy-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-700 mx-auto mb-4"></div>
-          <p className="text-purple-700 text-lg">Loading your rides...</p>
-        </div>
-      </div>
+      <PageContainer>
+        <ContentWrapper>
+          <div className="animate-pulse">
+            <Header>
+              <div className="h-8 w-64 bg-gray-200 rounded mb-4"></div>
+              <div className="h-4 w-48 bg-gray-200 rounded"></div>
+            </Header>
+            {[1, 2, 3].map(i => (
+              <TripCard key={i}>
+                <div className="h-24 bg-gray-100 rounded mb-4"></div>
+              </TripCard>
+            ))}
+          </div>
+        </ContentWrapper>
+      </PageContainer>
     );
   }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="min-h-screen trustworthy-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="bg-red-50 p-4 rounded-lg">
-            <p className="text-red-700">{error}</p>
-            <button 
-              onClick={fetchUserRides}
-              className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors duration-200"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const filteredTrips = filterTrips(activeTab);
 
   return (
-    <>
-      <style jsx global>{`
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+    <PageContainer>
+      <ContentWrapper>
+        <Header>
+          <h1>Your Trips</h1>
+          <p>View and manage all your ride activities</p>
+        </Header>
 
-        .trustworthy-bg {
-          background: linear-gradient(135deg, 
-            #f3e8ff 0%,    /* Purple 100 */
-            #e9d5ff 50%,   /* Purple 200 */
-            #ddd6fe 100%   /* Purple 300 */
-          );
-        }
+        <TabContainer>
+          <Tab 
+            active={activeTab === 'all'} 
+            onClick={() => setActiveTab('all')}
+          >
+            All Trips
+          </Tab>
+          <Tab 
+            active={activeTab === 'upcoming'} 
+            onClick={() => setActiveTab('upcoming')}
+          >
+            Upcoming
+          </Tab>
+          <Tab 
+            active={activeTab === 'ongoing'} 
+            onClick={() => setActiveTab('ongoing')}
+          >
+            Ongoing
+          </Tab>
+          <Tab 
+            active={activeTab === 'past'} 
+            onClick={() => setActiveTab('past')}
+          >
+            Past
+          </Tab>
+        </TabContainer>
 
-        .header-bg {
-          background: linear-gradient(135deg, 
-            #6b21a8 0%,    /* Purple 800 */
-            #7e22ce 50%,   /* Purple 700 */
-            #9333ea 100%   /* Purple 600 */
-          );
-        }
-      `}</style>
-
-      <div className="min-h-screen trustworthy-bg">
-        <div className="header-bg">
-          <div className="max-w-6xl mx-auto p-6">
-            <div className="py-8 mt-16">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-                  </svg>
-                  <h1 className="text-4xl font-bold text-white tracking-wider" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
-                    RIDE<span className="text-purple-300">-</span><span className="text-purple-200">90</span>
-                  </h1>
-                </div>
-                <span className="px-4 py-1.5 bg-white/10 text-white rounded-full text-sm font-medium border border-white/20 backdrop-blur-sm">
-                  Ride Sharing Platform
+        {filteredTrips.length === 0 ? (
+          <EmptyState>
+            <FaCar />
+            <h3>No trips found</h3>
+            <p>You haven't taken any trips in this category yet</p>
+          </EmptyState>
+        ) : (
+          filteredTrips.map(trip => (
+            <TripCard key={trip.rideId} onClick={() => router.push(`/trip-details/${trip.rideId}`)}>
+              <TripHeader>
+                <span className="trip-id">Trip ID: {trip.rideId}</span>
+                <span className={`trip-status ${getStatusClass(trip.status)}`}>
+                  {trip.status.charAt(0).toUpperCase() + trip.status.slice(1)}
                 </span>
-              </div>
-              <p className="text-indigo-100 text-lg max-w-2xl">
-                Keep Track Of Your Rides..!
-              </p>
-            </div>
-          </div>
-        </div>
+              </TripHeader>
 
-        <div className="max-w-6xl mx-auto px-6 -mt-8">
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <div className="flex gap-1 px-6 pt-4">
-              <TabButton tab="upcoming" label="Upcoming Rides" />
-              <TabButton tab="current" label="Current Rides" />
-              <TabButton tab="past" label="Past Rides" />
-            </div>
+              <LocationInfo>
+                <div className="location-details">
+                  <div className="location-type">Pickup</div>
+                  <div className="address">{trip.pickupLocation.address}</div>
+                </div>
+                <div className="location-details">
+                  <div className="location-type">Drop-off</div>
+                  <div className="address">{trip.dropLocation.address}</div>
+                </div>
+              </LocationInfo>
 
-            <div className={`${isContentVisible ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 p-6 bg-gray-50/50`}>
-              <div className="space-y-4">
-                {rides[activeTab].map((ride, index) => (
-                  <RideCard key={ride.id} ride={ride} type={activeTab} index={index} />
-                ))}
-                {rides[activeTab].length === 0 && (
-                  <div className="text-center py-12">
-                    <p className="text-gray-500 text-lg">
-                      No rides found in this category
-                    </p>
+              <TripDetails>
+                <div className="detail-item">
+                  <FaClock />
+                  <div>
+                    <div className="label">Date & Time</div>
+                    <div className="value">{formatDate(trip.createdAt)}</div>
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <FaMoneyBillWave />
+                  <div>
+                    <div className="label">Fare</div>
+                    <div className="value">₹{trip.estimatedFare}</div>
+                  </div>
+                </div>
+                <div className="detail-item">
+                  <FaMapMarkerAlt />
+                  <div>
+                    <div className="label">Distance</div>
+                    <div className="value">{trip.distance} km</div>
+                  </div>
+                </div>
+                {trip.status === 'completed' && trip.rating && (
+                  <div className="detail-item">
+                    <FaStar />
+                    <div>
+                      <div className="label">Rating</div>
+                      <div className="value">{trip.rating} ⭐</div>
+                    </div>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
+              </TripDetails>
+            </TripCard>
+          ))
+        )}
+      </ContentWrapper>
+    </PageContainer>
   );
 }
