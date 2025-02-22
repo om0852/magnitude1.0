@@ -1,14 +1,59 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { getSession } from 'next-auth/react';
 
 export default function ActivityPage() {
   const router = useRouter();
   const [selectedRide, setSelectedRide] = useState(null);
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isContentVisible, setIsContentVisible] = useState(true);
+  const [rides, setRides] = useState({
+    upcoming: [],
+    current: [],
+    past: []
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch user rides data
+  const fetchUserRides = async () => {
+    try {
+      const session = await getSession();
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+
+      const response = await fetch('/api/rides');
+      if (!response.ok) {
+        throw new Error('Failed to fetch rides');
+      }
+
+      const data = await response.json();
+      
+      // Categorize rides based on their status and dates
+      const now = new Date();
+      const categorizedRides = {
+        upcoming: data.filter(ride => new Date(ride.date) > now && ride.status !== 'cancelled'),
+        current: data.filter(ride => ride.status === 'in_progress'),
+        past: data.filter(ride => new Date(ride.date) < now || ride.status === 'completed')
+      };
+
+      setRides(categorizedRides);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error fetching rides:', error);
+      setError('Failed to load rides. Please try again later.');
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUserRides();
+  }, []);
 
   // Handle tab change with animation
   const handleTabChange = (tab) => {
@@ -17,21 +62,6 @@ export default function ActivityPage() {
       setActiveTab(tab);
       setIsContentVisible(true);
     }, 300);
-  };
-
-  // Sample data - in a real app, this would come from an API or database
-  const rides = {
-    upcoming: [
-      { id: 1, title: "Morning Commute", date: "2024-03-25", time: "08:00 AM", pickup: "Home", destination: "Office" },
-      { id: 2, title: "Airport Transfer", date: "2024-03-26", time: "02:30 PM", pickup: "Home", destination: "Airport" },
-    ],
-    current: [
-      { id: 3, title: "Shopping Trip", date: "2024-03-24", time: "Now", pickup: "Mall", destination: "Home", status: "In Progress" },
-    ],
-    past: [
-      { id: 4, title: "Evening Return", date: "2024-03-23", time: "06:00 PM", pickup: "Office", destination: "Home", status: "Completed" },
-      { id: 5, title: "Weekend Trip", date: "2024-03-22", time: "11:00 AM", pickup: "Home", destination: "Beach", status: "Completed" },
-    ],
   };
 
   const handleRideClick = (ride) => {
@@ -49,24 +79,25 @@ export default function ActivityPage() {
       }}
     >
       <div className="flex justify-between items-start mb-4">
-        <h3 className="text-xl font-semibold text-gray-800 group-hover:text-indigo-700">{ride.title}</h3>
+        <div>
+          <h3 className="text-xl font-semibold text-gray-800 group-hover:text-indigo-700">
+            {ride.pickup} to {ride.destination}
+          </h3>
+          <p className="text-sm text-gray-500">{new Date(ride.date).toLocaleDateString()} - {ride.time}</p>
+        </div>
         {ride.status && (
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            ride.status === "In Progress" 
+            ride.status === "in_progress" 
               ? "bg-blue-50 text-blue-700" 
-              : "bg-green-50 text-green-700"
+              : ride.status === "completed"
+              ? "bg-green-50 text-green-700"
+              : "bg-yellow-50 text-yellow-700"
           }`}>
-            {ride.status}
+            {ride.status.replace('_', ' ').charAt(0).toUpperCase() + ride.status.slice(1)}
           </span>
         )}
       </div>
       <div className="space-y-3 text-gray-600">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <p>{ride.date} - {ride.time}</p>
-        </div>
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -80,6 +111,22 @@ export default function ActivityPage() {
           </svg>
           <p>To: {ride.destination}</p>
         </div>
+        {ride.driver && (
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            <p>Driver: {ride.driver}</p>
+          </div>
+        )}
+        {ride.fare && (
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p>Fare: ₹{ride.fare}</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -96,6 +143,37 @@ export default function ActivityPage() {
       {label}
     </button>
   );
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen trustworthy-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-700 mx-auto mb-4"></div>
+          <p className="text-purple-700 text-lg">Loading your rides...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen trustworthy-bg flex items-center justify-center">
+        <div className="text-center">
+          <div className="bg-red-50 p-4 rounded-lg">
+            <p className="text-red-700">{error}</p>
+            <button 
+              onClick={fetchUserRides}
+              className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors duration-200"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

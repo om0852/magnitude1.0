@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function AccountPage() {
+  const router = useRouter();
   const [activeSection, setActiveSection] = useState('profile');
   const [selectedImage, setSelectedImage] = useState(null);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
@@ -1337,9 +1340,40 @@ export default function AccountPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-100">
-      {showPasswordModal && <PasswordChangeModal />}
-      <div className="max-w-6xl mx-auto p-6">
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-gradient-to-r from-purple-700 to-purple-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center gap-3">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+              </svg>
+              <h1 className="text-2xl font-bold text-white">
+                RIDE<span className="text-purple-200">-</span><span className="text-purple-100">90</span>
+              </h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => router.push('/activity')}
+                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 text-white hover:bg-purple-600"
+              >
+                Activity
+              </button>
+              <button
+                onClick={() => router.push('/account')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
+                  true ? 'bg-white text-purple-700' : 'text-white hover:bg-purple-600'
+                }`}
+              >
+                Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-1">
