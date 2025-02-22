@@ -3,13 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-<<<<<<< HEAD
 import styled from 'styled-components';
 import { FaCar, FaMapMarkerAlt, FaClock, FaMoneyBillWave, FaStar } from 'react-icons/fa';
 import axios from 'axios';
-=======
-import { getSession, useSession } from 'next-auth/react';
->>>>>>> ef68c8db60fe1ac78f7fee1409c532957a23d777
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -191,24 +187,9 @@ const EmptyState = styled.div`
 export default function Activity() {
   const { data: session, status } = useSession();
   const router = useRouter();
-<<<<<<< HEAD
   const [activeTab, setActiveTab] = useState('all');
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-=======
-  const { data: session } = useSession();
-  const [selectedRide, setSelectedRide] = useState(null);
-  const [activeTab, setActiveTab] = useState('upcoming');
-  const [isContentVisible, setIsContentVisible] = useState(true);
-  const [rides, setRides] = useState({
-    upcoming: [],
-    current: [],
-    past: []
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activities, setActivities] = useState([]);
->>>>>>> ef68c8db60fe1ac78f7fee1409c532957a23d777
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -221,29 +202,9 @@ export default function Activity() {
 
   const fetchTrips = async () => {
     try {
-<<<<<<< HEAD
       setLoading(true);
       const response = await axios.get('/api/trips');
       setTrips(response.data.data);
-=======
-      const response = await fetch('/api/rides');
-      if (!response.ok) {
-        throw new Error('Failed to fetch rides');
-      }
-
-      const data = await response.json();
-      
-      // Categorize rides based on their status and dates
-      const now = new Date();
-      const categorizedRides = {
-        upcoming: data.filter(ride => new Date(ride.date) > now && ride.status !== 'cancelled'),
-        current: data.filter(ride => ride.status === 'in_progress'),
-        past: data.filter(ride => new Date(ride.date) < now || ride.status === 'completed')
-      };
-
-      setRides(categorizedRides);
-      setIsLoading(false);
->>>>>>> ef68c8db60fe1ac78f7fee1409c532957a23d777
     } catch (error) {
       console.error('Error fetching trips:', error);
     } finally {
@@ -251,7 +212,6 @@ export default function Activity() {
     }
   };
 
-<<<<<<< HEAD
   const filterTrips = (status) => {
     if (status === 'all') return trips;
     return trips.filter(trip => {
@@ -260,35 +220,6 @@ export default function Activity() {
       if (status === 'past') return trip.status === 'completed';
       return true;
     });
-=======
-  useEffect(() => {
-    fetchUserRides();
-  }, []);
-
-  // Fetch activities
-  const fetchActivities = async () => {
-    try {
-      const response = await fetch('/api/activities');
-      if (!response.ok) throw new Error('Failed to fetch activities');
-      const data = await response.json();
-      setActivities(data);
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchActivities();
-  }, []);
-
-  // Handle tab change with animation
-  const handleTabChange = (tab) => {
-    setIsContentVisible(false);
-    setTimeout(() => {
-      setActiveTab(tab);
-      setIsContentVisible(true);
-    }, 300);
->>>>>>> ef68c8db60fe1ac78f7fee1409c532957a23d777
   };
 
   const formatDate = (dateString) => {
@@ -301,7 +232,6 @@ export default function Activity() {
     });
   };
 
-<<<<<<< HEAD
   const getStatusClass = (status) => {
     switch (status) {
       case 'pending': return 'upcoming';
@@ -310,89 +240,6 @@ export default function Activity() {
       default: return '';
     }
   };
-=======
-  const handleActivityAction = async (id, action) => {
-    try {
-      const response = await fetch(`/api/activities/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action })
-      });
-
-      if (!response.ok) throw new Error('Failed to update activity');
-      
-      // Refresh activities after successful action
-      fetchActivities();
-    } catch (error) {
-      console.error('Error:', error);
-    }
-  };
-
-  const RideCard = ({ ride, type, index }) => (
-    <div 
-      onClick={() => handleRideClick(ride)}
-      className="bg-white rounded-xl p-6 cursor-pointer transition-all duration-300 hover:shadow-lg border border-gray-100 hover:border-indigo-100 group"
-      style={{
-        animation: `slideIn 0.5s ease-out forwards`,
-        animationDelay: `${index * 0.1}s`,
-        opacity: 0,
-      }}
-    >
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h3 className="text-xl font-semibold text-gray-800 group-hover:text-indigo-700">
-            {ride.pickup} to {ride.destination}
-          </h3>
-          <p className="text-sm text-gray-500">{new Date(ride.date).toLocaleDateString()} - {ride.time}</p>
-        </div>
-        {ride.status && (
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-            ride.status === "in_progress" 
-              ? "bg-blue-50 text-blue-700" 
-              : ride.status === "completed"
-              ? "bg-green-50 text-green-700"
-              : "bg-yellow-50 text-yellow-700"
-          }`}>
-            {ride.status.replace('_', ' ').charAt(0).toUpperCase() + ride.status.slice(1)}
-          </span>
-        )}
-      </div>
-      <div className="space-y-3 text-gray-600">
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <p>From: {ride.pickup}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-          </svg>
-          <p>To: {ride.destination}</p>
-        </div>
-        {ride.driver && (
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <p>Driver: {ride.driver}</p>
-          </div>
-        )}
-        {ride.fare && (
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p>Fare: ₹{ride.fare}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
->>>>>>> ef68c8db60fe1ac78f7fee1409c532957a23d777
 
   if (loading) {
     return (
@@ -509,68 +356,11 @@ export default function Activity() {
                     </div>
                   </div>
                 )}
-<<<<<<< HEAD
               </TripDetails>
             </TripCard>
           ))
         )}
       </ContentWrapper>
     </PageContainer>
-=======
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-4 py-8 mt-8">
-        <h1 className="text-3xl font-bold mb-6">Your Activities</h1>
-        <div className="space-y-4">
-          {activities.map((activity) => (
-            <div 
-              key={activity.id} 
-              className="bg-white p-6 rounded-lg shadow-md"
-            >
-              {/* Activity details */}
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-lg font-semibold">
-                    {activity.status} - {activity.type}
-                  </p>
-                  <p className="text-gray-600">
-                    From: {activity.pickupLocation}
-                  </p>
-                  <p className="text-gray-600">
-                    To: {activity.dropoffLocation}
-                  </p>
-                  <p className="text-gray-600">
-                    {new Date(activity.createdAt).toLocaleDateString()}
-                  </p>
-                </div>
-                
-                {/* Action buttons based on status */}
-                {activity.status === 'PENDING' && (
-                  <div className="space-x-2">
-                    <button
-                      onClick={() => handleActivityAction(activity.id, 'cancel')}
-                      className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => handleActivityAction(activity.id, 'complete')}
-                      className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                    >
-                      Complete
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
->>>>>>> ef68c8db60fe1ac78f7fee1409c532957a23d777
   );
 }
