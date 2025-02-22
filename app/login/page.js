@@ -214,6 +214,35 @@ const FireballContainer = styled(motion.div)`
   filter: brightness(1.2);
 `;
 
+const RoleToggleContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem;
+  border-radius: 1rem;
+  width: fit-content;
+`;
+
+const RoleOption = styled.button`
+  padding: 0.75rem 2rem;
+  border: none;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: ${props => props.active ? '#9f7aea' : 'transparent'};
+  color: ${props => props.active ? 'white' : 'rgba(255, 255, 255, 0.7)'};
+
+  &:hover {
+    color: white;
+  }
+
+  &:first-child {
+    margin-right: 0.5rem;
+  }
+`;
+
 const generateRandomPath = () => {
   const startX = Math.random() * 100; // Random start position
   const endX = startX + (Math.random() * 40 - 20); // Random end position with slight drift
@@ -248,6 +277,7 @@ const fireballVariants = {
 };
 
 export default function LoginPage() {
+  const [role, setRole] = useState('rider');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({});
@@ -292,7 +322,7 @@ export default function LoginPage() {
     try {
       setIsLoading(true);
       const result = await signIn('google', {
-        callbackUrl: '/',
+        callbackUrl: `/?role=${role}`,
         redirect: false,
       });
       
@@ -372,6 +402,23 @@ export default function LoginPage() {
             <h1>Welcome Back!</h1>
             <p>Please sign in to continue</p>
           </WelcomeText>
+
+          <RoleToggleContainer>
+            <RoleOption
+              type="button"
+              active={role === 'rider'}
+              onClick={() => setRole('rider')}
+            >
+              Rider
+            </RoleOption>
+            <RoleOption
+              type="button"
+              active={role === 'driver'}
+              onClick={() => setRole('driver')}
+            >
+              Driver
+            </RoleOption>
+          </RoleToggleContainer>
 
           <form onSubmit={handleLogin}>
             {errors.submit && (

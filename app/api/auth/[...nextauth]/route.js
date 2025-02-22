@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
-import connectDB from '@/app/lib/mongodb';
-import User from '@/app/models/User';
+import connectDB from '../../../../app/lib/mongodb';
+import User from '../../../../app/models/User';
 
 const authOptions = {
   providers: [
@@ -22,10 +22,13 @@ const authOptions = {
   },
   debug: process.env.NODE_ENV === 'development',
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account, profile, credentials }) {
       if (account.provider === "google") {
         try {
           await connectDB();
+          
+          // Get the role from the credentials
+          const role = credentials?.role || 'rider';
           
           // Check if user exists
           const existingUser = await User.findOne({ email: profile.email });
@@ -38,6 +41,7 @@ const authOptions = {
               image: profile.picture,
               emailVerified: profile.email_verified,
               provider: account.provider,
+              role: role,
             });
           } else {
             // Update existing user
@@ -48,6 +52,7 @@ const authOptions = {
                   name: profile.name,
                   image: profile.picture,
                   emailVerified: profile.email_verified,
+                  role: role, // Update role if changed
                 }
               }
             );
@@ -87,6 +92,7 @@ const authOptions = {
           session.user.id = user._id.toString();
           session.user.provider = user.provider;
           session.user.profileCompleted = user.profileCompleted;
+          session.user.role = user.role; // Add role to session
         }
         return session;
       } catch (error) {

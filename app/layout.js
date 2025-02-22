@@ -1,32 +1,33 @@
-import { Geist, Geist_Mono } from "next/font/google";
+'use client';
+
+import { Inter } from "next/font/google";
 import "./globals.css";
+import { SessionProvider } from "next-auth/react";
+import StyledComponentsRegistry from './lib/registry';
 import Navbar from './components/Navbar';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
   subsets: ["latin"],
+  variable: "--font-inter",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata = {
-  title: "Ride90 - Your Trusted Ride Partner",
-  description: "Modern ride-sharing platform for seamless transportation",
-};
+// export const metadata = {
+//   title: "Ride90 - Your Trusted Ride Partner",
+//   description: "Modern ride-sharing platform for seamless transportation",
+// };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <Navbar />
-        <main>
-          {children}
-        </main>
+      <body className={`${inter.variable} antialiased`}>
+        <SessionProvider>
+          <StyledComponentsRegistry>
+            {/* <Navbar /> */}
+            <main>
+              {children}
+            </main>
+          </StyledComponentsRegistry>
+        </SessionProvider>
       </body>
     </html>
   );
