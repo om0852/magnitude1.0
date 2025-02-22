@@ -261,24 +261,16 @@ export default function Activity() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    console.log('Session status:', status);
-    if (status === 'unauthenticated') {
-      router.push('/login');
-      return;
-    }
+  const fetchTrips = async (userSession) => {
+    if (!userSession?.user?.email) {
+      console.log('No session available for fetching trips');
+        return;
+      }
 
-    if (status === 'authenticated') {
-      console.log('User email:', session?.user?.email);
-      fetchTrips();
-    }
-  }, [status, router, session]);
-
-  const fetchTrips = async () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching trips...');
+      console.log('Fetching trips for user:', userSession.user.email);
       const response = await axios.get('/api/trips');
       console.log('API Response:', response.data);
       if (response.data.success) {
@@ -293,6 +285,19 @@ export default function Activity() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    console.log('Session status:', status, 'Session:', session);
+    
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+
+    if (status === 'authenticated' && session) {
+      fetchTrips(session);
+    }
+  }, [status, session, router]);
 
   const filterTrips = (status) => {
     if (status === 'all') return trips;
@@ -336,7 +341,7 @@ export default function Activity() {
           <div className="vehicle">
             {trip.driverDetails.vehicleModel} • {trip.driverDetails.vehicleNumber}
           </div>
-        </div>
+          </div>
         <div className="rating">
           <div className="stars">⭐ {trip.driverDetails.rating.toFixed(1)}</div>
           <div className="rides">{trip.driverDetails.totalRides} rides</div>
@@ -358,7 +363,7 @@ export default function Activity() {
             <h3>Error Loading Trips</h3>
             <p>{error}</p>
             <button 
-              onClick={fetchTrips}
+              onClick={() => fetchTrips(session)}
               className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
             >
               Try Again
@@ -426,11 +431,11 @@ export default function Activity() {
                 <div className="location-details">
                   <div className="location-type">Pickup</div>
                   <div className="address">{trip.pickupLocation.address}</div>
-                </div>
+              </div>
                 <div className="location-details">
                   <div className="location-type">Drop-off</div>
                   <div className="address">{trip.dropLocation.address}</div>
-                </div>
+            </div>
               </LocationInfo>
 
               <TripDetails>
@@ -439,30 +444,30 @@ export default function Activity() {
                   <div>
                     <div className="label">Date & Time</div>
                     <div className="value">{formatDate(trip.createdAt)}</div>
-                  </div>
-                </div>
+          </div>
+        </div>
                 <div className="detail-item">
                   <FaMoneyBillWave />
                   <div>
                     <div className="label">Fare</div>
                     <div className="value">₹{trip.estimatedFare}</div>
                   </div>
-                </div>
+              </div>
                 <div className="detail-item">
                   <FaMapMarkerAlt />
                   <div>
                     <div className="label">Distance</div>
                     <div className="value">{trip.distance} km</div>
-                  </div>
-                </div>
+            </div>
+          </div>
                 {trip.status === 'completed' && trip.rating && (
                   <div className="detail-item">
                     <FaStar />
                     <div>
                       <div className="label">Rating</div>
                       <div className="value">{trip.rating} ⭐</div>
-                    </div>
-                  </div>
+        </div>
+      </div>
                 )}
               </TripDetails>
 

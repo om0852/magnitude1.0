@@ -33,6 +33,10 @@ const rideSchema = new mongoose.Schema({
   userId: {
     type: String,
   },
+  userEmail: {
+    type: String,
+    required: true
+  },
   socketId: {
     type: String,
   },
@@ -120,7 +124,7 @@ export async function POST(req) {
 
     await connectDB();
     const { rideId, tripRequest } = await req.json();
-    console.log(tripRequest)
+    console.log('Trip Request:', tripRequest);
 
     if (!rideId || !tripRequest) {
       return NextResponse.json({ error: 'Ride ID and trip request details are required' }, { status: 400 });
@@ -143,9 +147,10 @@ export async function POST(req) {
     if (ride) {
       // Update existing ride
       ride.driverId = driver._id;
-      ride.status = 'in_progress';
+      ride.status = 'accepted';
       ride.startTime = currentDate;
       ride.otp = otp;
+      ride.userEmail = tripRequest.userDetails.email;
       await ride.save();
     } else {
       // Create new ride with validated data
@@ -154,6 +159,7 @@ export async function POST(req) {
         requestId: tripRequest.requestId,
         driverId: driver._id,
         userId: tripRequest.userId,
+        userEmail: tripRequest.userDetails.email,
         socketId: tripRequest.socketId,
         pickupLocation: tripRequest.pickupLocation,
         dropLocation: tripRequest.dropLocation,

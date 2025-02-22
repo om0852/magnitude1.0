@@ -6,7 +6,7 @@ import Driver from '../../../models/Driver';
 export async function GET(request, { params }) {
   try {
     await connectDB();
-    const { rideId } = params;
+    const { rideId } = await params;
 
     // Fetch ride with driver details using rideId field instead of _id
     const ride = await Ride.findOne({ rideId }).lean();

@@ -90,15 +90,33 @@ const RideDetails = ({ params }) => {
       });
 
       if (response.data.success) {
-        setIsVerified(true);
-        toast.success('OTP verified successfully!');
+        toast.success('OTP verified successfully! Ride started.');
         fetchRideDetails();
         setOtpInput('');
       } else {
         setError('Invalid OTP');
       }
     } catch (err) {
+      console.error('Error verifying OTP:', err);
+      toast.error(err.response?.data?.error || 'Failed to verify OTP');
       setError('Failed to verify OTP');
+    }
+  };
+
+  const handleCompleteRide = async () => {
+    try {
+      const response = await axios.put(`/api/driver/rides/${rideId}`, {
+        status: 'completed',
+        endTime: new Date()
+      });
+
+      if (response.data.success) {
+        toast.success('Ride completed successfully!');
+        fetchRideDetails();
+      }
+    } catch (err) {
+      toast.error('Failed to complete ride');
+      console.error('Error completing ride:', err);
     }
   };
 
@@ -135,7 +153,7 @@ const RideDetails = ({ params }) => {
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white p-8">
             <h1 className="text-3xl font-bold mb-2">Ride Details</h1>
-            {!isVerified && (
+            {ride.status === 'in_progress' && (
               <div className="mb-6 p-6 bg-white/20 backdrop-blur-sm rounded-xl">
                 <h2 className="text-xl font-semibold mb-4">Verify Ride OTP</h2>
                 <div className="flex items-center space-x-4">
@@ -158,6 +176,16 @@ const RideDetails = ({ params }) => {
                 <p className="text-sm mt-2 text-white/80">
                   Ask the passenger for the 4-digit OTP to start the ride
                 </p>
+              </div>
+            )}
+            {ride.status === 'accepted' && (
+              <div className="mb-6 p-6 bg-white/20 backdrop-blur-sm rounded-xl">
+                <button
+                  onClick={handleCompleteRide}
+                  className="w-full px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200 font-semibold"
+                >
+                  Complete Ride
+                </button>
               </div>
             )}
             <div className="flex items-center space-x-3">

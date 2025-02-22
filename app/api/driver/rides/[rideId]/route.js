@@ -4,7 +4,7 @@ import Ride from '../../../../models/Ride';
 import Driver from '../../../../models/Driver';
 import { getServerSession } from 'next-auth';
 
-export async function GET(request, context) {
+export async function GET(request, { params }) {
   try {
     const session = await getServerSession();
     if (!session) {
@@ -12,7 +12,14 @@ export async function GET(request, context) {
     }
 
     await connectDB();
-    const rideId = context.params.rideId;
+    const { rideId } = await params;
+
+    if (!rideId) {
+      return NextResponse.json(
+        { error: 'Ride ID is required' },
+        { status: 400 }
+      );
+    }
 
     // Fetch ride with driver details using rideId field
     const ride = await Ride.findOne({ rideId }).lean();
@@ -69,7 +76,7 @@ export async function GET(request, context) {
   } catch (error) {
     console.error('Error fetching ride details:', error);
     return NextResponse.json(
-      { message: 'Failed to fetch ride details' },
+      { error: error.message || 'Failed to fetch ride details' },
       { status: 500 }
     );
   }
@@ -83,22 +90,34 @@ export async function PUT(request, { params }) {
     }
 
     await connectDB();
-    const { rideId } = params;
+    const { rideId } = await params;
+    
+    if (!rideId) {
+      return NextResponse.json(
+        { error: 'Ride ID is required' },
+        { status: 400 }
+      );
+    }
+
     const data = await request.json();
 
     const ride = await Ride.findOneAndUpdate(
-      { rideId: rideId },
+      { rideId },
       { ...data, updatedAt: new Date() },
       { new: true }
-    )
+    );
+
     if (!ride) {
       return NextResponse.json(
-        { message: 'Ride not found' },
+        { error: 'Ride not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, data: ride });
+    return NextResponse.json({ 
+      success: true, 
+      data: ride 
+    });
 
   } catch (error) {
     console.error('API Error:', error);

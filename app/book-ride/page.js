@@ -9,6 +9,7 @@ import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import io from 'socket.io-client';
 import { toast } from 'react-hot-toast';
+import { useSession } from 'next-auth/react';
 
 // Fix for default marker icons in Leaflet
 const sourceIcon = L.icon({
@@ -689,6 +690,7 @@ const ConnectingText = styled.div`
 `;
 
 export default function BookRide() {
+  const { data: session, status } = useSession();
   const searchParams = useSearchParams();
   const vehicleType = parseInt(searchParams.get('type') || '1', 10);
   const router = useRouter();
@@ -717,6 +719,81 @@ export default function BookRide() {
   const toInputRef = useRef(null);
   const fromSuggestionsRef = useRef(null);
   const toSuggestionsRef = useRef(null);
+
+  // Check authentication status
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+    }
+  }, [status, router]);
+
+  // Socket connection effect
+  useEffect(() => {
+    if (status === 'authenticated' && session) {
+      console.log('Authenticated session:', session);
+      const newSocket = io('http://localhost:5000');
+      setSocket(newSocket);
+
+      newSocket.on('connect', () => {
+        console.log('Connected to ride booking system');
+      });
+
+      newSocket.on('driverAccepted', (response) => {
+        console.log('Driver accepted response:', response);
+        handleDriverAccepted(response);
+      });
+
+      newSocket.on('tripRejected', (response) => {
+        handleTripRejected(response);
+      });
+
+      newSocket.on('noDriversAvailable', () => {
+        handleNoDriversAvailable();
+      });
+
+      return () => {
+        if (newSocket) {
+          newSocket.disconnect();
+        }
+      };
+    }
+  }, [status, session]);
+
+  const handleDriverAccepted = (response) => {
+    const { rideId, driverName } = response;
+    setMatchedDriver(response);
+    setSearchingForDriver(false);
+    setIsConnecting(false);
+    
+    toast.success(`${driverName} has accepted your ride request!`, {
+      duration: 5000,
+      icon: '🚗'
+    });
+    
+    try {
+      const audio = new Audio('/notification-sound.mp3');
+      audio.play();
+    } catch (e) {
+      console.log('Audio play failed:', e);
+    }
+    
+    setTimeout(() => {
+      router.push(`/trip-details/${rideId}`);
+    }, 2000);
+  };
+
+  const handleTripRejected = (response) => {
+    const { message } = response;
+    setIsConnecting(false);
+    setSearchingForDriver(false);
+    toast.error(message || 'Driver rejected the trip request');
+  };
+
+  const handleNoDriversAvailable = () => {
+    setIsConnecting(false);
+    setSearchingForDriver(false);
+    toast.error('No drivers available at the moment. Please try again later.');
+  };
 
   // Function to fetch location suggestions
   const fetchSuggestions = async (query, setterFunction) => {
@@ -948,94 +1025,13 @@ export default function BookRide() {
     });
   };
 
-  // Update the socket connection useEffect
-  useEffect(() => {
-    const newSocket = io('http://localhost:5000');
-    setSocket(newSocket);
-
-    // Socket event listeners
-    newSocket.on('connect', () => {
-      console.log('Connected to ride booking system');
-    });
-
-    newSocket.on('driverAccepted', (response) => {
-      console.log('Driver accepted response:', response);
-      const { rideId, driverName, vehicleNumber, contactNumber, driverRating, driverPhoto, tripDetails } = response;
-      
-      setMatchedDriver(response);
-      setSearchingForDriver(false);
-      setIsConnecting(false);
-      
-      // Show success toast with driver details
-      toast.success(`${driverName} has accepted your ride request!`, {
-        duration: 5000,
-        icon: '🚗'
-      });
-      
-      // Play notification sound
-      try {
-        const audio = new Audio('/notification-sound.mp3');
-        audio.play();
-      } catch (e) {
-        console.log('Audio play failed:', e);
-      }
-      
-      // Navigate to trip details page after a short delay
-      setTimeout(() => {
-        router.push(`/trip-details/${rideId}`);
-      }, 2000);
-    });
-    newSocket.on('driverAccepted', (response) => {
-      console.log('Driver accepted response:', response);
-      const { rideId, driverName, vehicleNumber, contactNumber, driverRating, driverPhoto, tripDetails } = response;
-      
-      setMatchedDriver(response);
-      setSearchingForDriver(false);
-      setIsConnecting(false);
-      
-      // Show success toast with driver details
-      toast.success(`${driverName} has accepted your ride request!`, {
-        duration: 5000,
-        icon: '🚗'
-      });
-      
-      // Play notification sound
-      try {
-        const audio = new Audio('/notification-sound.mp3');
-        audio.play();
-      } catch (e) {
-        console.log('Audio play failed:', e);
-      }
-      
-      // Navigate to trip details page after a short delay
-      setTimeout(() => {
-        router.push(`/trip-details/${rideId}`);
-      }, 2000);
-    });
-
-    newSocket.on('tripRejected', (response) => {
-      const { message } = response;
-      setIsConnecting(false);
-      setSearchingForDriver(false);
-      toast.error(message || 'Driver rejected the trip request');
-    });
-
-    newSocket.on('noDriversAvailable', () => {
-      setIsConnecting(false);
-      setSearchingForDriver(false);
-      toast.error('No drivers available at the moment. Please try again later.');
-    });
-
-    // Cleanup on unmount
-    return () => {
-      if (newSocket) {
-        newSocket.disconnect();
-      }
-    };
-  }, [router]);
-
-  // Update handleConfirmTrip function
   const handleConfirmTrip = () => {
+    if (!session) {
+      toast.error('Please sign in to book a ride');
+      router.push('/auth/signin');
+      return;
+    }
+
     if (!fromCoords || !toCoords || !selectedVehicle) {
       toast.error('Please select pickup, dropoff locations and vehicle type');
       return;
@@ -1044,65 +1040,26 @@ export default function BookRide() {
     setIsConfirming(true);
     setIsConnecting(true);
 
-    // Initialize socket connection
-    const newSocket = io('http://localhost:5000');
-    setSocket(newSocket);
-
-    // Listen for nearby drivers updates
-    newSocket.on('nearbyDriversUpdated', (drivers) => {
-      console.log('Nearby drivers:', drivers);
-      if (drivers.length === 0) {
-        setIsConnecting(false);
-        toast.error('No drivers available nearby');
-      }
-    });
-
-    // Listen for driver acceptance
-    newSocket.on('driverAccepted', (response) => {
-      const { driverName, rideId, message } = response;
+    if (!socket?.connected) {
+      toast.error('Connection to server lost. Please try again.');
+      setIsConfirming(false);
       setIsConnecting(false);
-      setMatchedDriver(response);
-      
-      // Show success toast with driver details
-      toast.success(message || `Driver ${driverName} has been assigned to your trip!`, {
-        duration: 5000,
-        icon: '🚗'
-      });
-      
-      // Play notification sound
-      try {
-        const audio = new Audio('/notification-sound.mp3');
-        audio.play();
-      } catch (e) {
-        console.log('Audio play failed:', e);
-      }
-      
-      // Navigate to trip details page
-      setTimeout(() => {
-        router.push(`/trip-details/${rideId}`);
-      }, 2000);
-    });
+      return;
+    }
 
-    // Listen for trip rejection
-    newSocket.on('tripRejected', () => {
-      setIsConnecting(false);
-      toast.error('Driver rejected the trip request');
-    });
+    // Get user details from session
+    const userDetails = {
+      userId: session.user?.id,
+      name: session.user?.name,
+      email: session.user?.email,
+      phoneNumber: session.user?.phone,
+      gender: session.user?.gender
+    };
 
-    // Listen for no drivers available
-    newSocket.on('noDriversAvailable', () => {
-      setIsConnecting(false);
-      toast.error('No drivers available at the moment');
-    });
+    console.log('Sending trip request with user details:', userDetails);
 
-    // First get nearby drivers
-    newSocket.emit('getNearbyDrivers', {
-      lat: fromCoords[0],
-      lng: fromCoords[1]
-    });
-
-    // Emit trip request
-    newSocket.emit('requestTrip', {
+    // Emit trip request with user details
+    socket.emit('requestTrip', {
       pickupLocation: {
         lat: fromCoords[0],
         lng: fromCoords[1],
@@ -1116,7 +1073,8 @@ export default function BookRide() {
       vehicleType: selectedVehicle,
       estimatedFare: routeDetails?.fares.find(v => v.id === selectedVehicle)?.fare?.total || 0,
       distance: routeDetails?.distance || 0,
-      duration: routeDetails?.duration || 0
+      duration: routeDetails?.duration || 0,
+      ...userDetails
     });
 
     toast('Searching for nearby drivers...', {

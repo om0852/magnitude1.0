@@ -230,7 +230,16 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Extract user details with defaults
+    // Log and validate user details
+    console.log("Incoming user details:", {
+      userId: tripRequest.userId,
+      phoneNumber: tripRequest.phoneNumber,
+      email: tripRequest.email,
+      gender: tripRequest.gender,
+      name: tripRequest.name
+    });
+
+    // Extract user details with defaults and validation
     const userDetails = {
       userId: tripRequest.userId || socket.id,
       phoneNumber: tripRequest.phoneNumber || 'Not provided',
@@ -240,16 +249,24 @@ io.on("connection", (socket) => {
       socketId: socket.id
     };
 
+    // Validate email format if provided
+    if (userDetails.email !== 'Not provided' && !userDetails.email.includes('@')) {
+      socket.emit("tripRequestError", "Invalid email format");
+      return;
+    }
+
     console.log("Processed user details:", userDetails);
 
     // Store the trip request with user details
     const fullTripRequest = {
       ...tripRequest,
-      ...userDetails,
+      userDetails, // Store as nested userDetails object
       status: 'pending',
       timestamp: new Date(),
       requestId: `REQ${Date.now()}${Math.random().toString(36).substr(2, 4)}`
     };
+
+    console.log("Created full trip request:", fullTripRequest);
 
     // Generate a unique ride ID
     const rideId = `RIDE${Date.now()}${Math.random().toString(36).substr(2, 4)}`;
@@ -269,15 +286,16 @@ io.on("connection", (socket) => {
       status: 'pending',
       timestamp: new Date(),
       fare: tripRequest.fare || 0,
-      paymentMethod: tripRequest.paymentMethod || 'cash'
+      paymentMethod: tripRequest.paymentMethod || 'cash',
+      userDetails // Include the userDetails object in ride request
     };
 
-    console.log("Created ride request:", rideRequest);
+    console.log("Created ride request with user details:", rideRequest);
 
     // Store the updated trip request with rideId
     tripRequests.set(socket.id, {
       ...fullTripRequest,
-      rideId: rideId  // Add the rideId to the stored request
+      rideId: rideId
     });
 
     // Find the best available driver
@@ -295,6 +313,7 @@ io.on("connection", (socket) => {
     const driverSocket = io.sockets.sockets.get(bestDriver.socketId);
     if (driverSocket) {
       console.log("Sending trip request to driver:", bestDriver.driverId);
+      console.log("Ride request data sent to driver:", rideRequest);
       driverSocket.emit("newTripRequest", rideRequest);
       
       // Set a timeout for driver response
@@ -329,7 +348,7 @@ io.on("connection", (socket) => {
 
     if (userSocketEntry && Array.isArray(userSocketEntry)) {
       const [userId, request] = userSocketEntry;
-      const user = io.sockets.sockets.get(request.socketId);
+      const user = io.sockets.sockets.get(userSocketEntry[1].userDetails.socketId);
       
       if (user) {
         console.log("Notifying user about accepted ride");

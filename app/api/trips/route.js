@@ -14,11 +14,14 @@ export async function GET() {
     }
 
     await connectDB();
-    console.log('Connected to DB');
+    console.log('Connected to DB, searching for email:', session.user.email);
 
-    // Fetch all rides for the user's email
+    // Fetch all rides for the user's email using $or to check both fields
     const rides = await Ride.find({
-      'userDetails.email': session.user.email
+      $or: [
+        { userEmail: session.user.email },
+        { 'userDetails.email': session.user.email }
+      ]
     })
     .sort({ createdAt: -1 }) // Sort by newest first
     .lean();
@@ -57,7 +60,8 @@ export async function GET() {
         endTime: ride.endTime,
         rating: ride.rating,
         driverDetails,
-        otp: ride.status === 'in_progress' ? ride.otp : undefined
+        otp: ride.status === 'in_progress' ? ride.otp : undefined,
+        userEmail: ride.userEmail
       };
     }));
 

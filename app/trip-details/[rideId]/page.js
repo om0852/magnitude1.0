@@ -4,12 +4,20 @@ import { useState, useEffect, use } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
 import { FaCar, FaUser, FaPhone, FaMapMarkerAlt, FaClock, FaMoneyBillWave, FaRoute } from 'react-icons/fa';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import io from 'socket.io-client';
 import { useRef } from 'react';
+
+// Dynamically import the Map component with no SSR
+const TripMap = dynamic(() => import('../../components/TripMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full bg-gray-100 rounded-lg flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
+    </div>
+  )
+});
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -268,55 +276,6 @@ const LiveStats = styled.div`
   }
 `;
 
-// Function to update map view
-function MapUpdater({ center, zoom }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, zoom);
-  }, [center, zoom, map]);
-  return null;
-}
-
-// Custom marker icons
-const createCustomIcon = (iconUrl) => new L.Icon({
-  iconUrl,
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const pickupIcon = createCustomIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png');
-const dropIcon = createCustomIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png');
-const carIcon = createCustomIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png');
-
-// Function to calculate route using OSRM
-const calculateRoute = async (start, end) => {
-  try {
-    const response = await fetch(
-      `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`
-    );
-    const data = await response.json();
-
-    if (data.code !== 'Ok') {
-      throw new Error('Failed to calculate route');
-    }
-
-    // Extract coordinates from the response
-    const coordinates = data.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng]);
-    
-    return {
-      coordinates,
-      distance: (data.routes[0].distance / 1000).toFixed(1),
-      duration: Math.round(data.routes[0].duration / 60)
-    };
-  } catch (error) {
-    console.error('Error calculating route:', error);
-    return null;
-  }
-};
-
 export default function TripDetails({ params }) {
   const unwrappedParams = use(params);
   const { rideId } = unwrappedParams;
@@ -338,6 +297,34 @@ export default function TripDetails({ params }) {
   const [socket, setSocket] = useState(null);
   const [lastUpdateTime, setLastUpdateTime] = useState(null);
   const mapRef = useRef(null);
+
+  // Function to calculate route between two points
+  const calculateRoute = async (start, end) => {
+    try {
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`
+      );
+      const data = await response.json();
+
+      if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+        throw new Error('No route found');
+      }
+
+      const route = data.routes[0];
+      const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+      const distance = (route.distance / 1000).toFixed(1); // Convert to km
+      const duration = Math.round(route.duration / 60); // Convert to minutes
+
+      return {
+        coordinates,
+        distance,
+        duration
+      };
+    } catch (error) {
+      console.error('Error calculating route:', error);
+      return null;
+    }
+  };
 
   // Function to get user's current location
   const getCurrentLocation = () => {
@@ -573,73 +560,14 @@ export default function TripDetails({ params }) {
           </LiveStats>
 
           <MapWrapper>
-            {typeof window !== 'undefined' && showMap && (
-              <MapContainer
-                center={driverLocation ? [driverLocation.lat, driverLocation.lng] : (fromCoords || mapCenter)}
-                zoom={13}
-                style={{ height: '100%', width: '100%' }}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                />
-                
-                {/* Driver Location Marker */}
-                {driverLocation && (
-                  <Marker 
-                    position={[driverLocation.lat, driverLocation.lng]}
-                    icon={carIcon}
-                  >
-                    <Popup>
-                      Driver's Location<br />
-                      Last updated: {new Date(driverLocation.timestamp).toLocaleTimeString()}
-                    </Popup>
-                  </Marker>
-                )}
-
-                {/* Pickup Location Marker */}
-                {fromCoords && (
-                  <Marker 
-                    position={fromCoords}
-                    icon={pickupIcon}
-                  >
-                    <Popup>Pickup: {trip?.pickupLocation?.address}</Popup>
-                  </Marker>
-                )}
-
-                {/* Drop Location Marker */}
-                {toCoords && (
-                  <Marker 
-                    position={toCoords}
-                    icon={dropIcon}
-                  >
-                    <Popup>Drop: {trip?.dropLocation?.address}</Popup>
-                  </Marker>
-                )}
-
-                {/* Route Line */}
-                {routePoints.length > 0 && (
-                  <Polyline
-                    positions={routePoints}
-                    pathOptions={{
-                      color: '#6D28D9',
-                      weight: 3,
-                      opacity: 0.7,
-                      dashArray: '10, 10',
-                      lineCap: 'round',
-                      lineJoin: 'round'
-                    }}
-                  />
-                )}
-
-                {/* Map Updater */}
-                {driverLocation && (
-                  <MapUpdater 
-                    center={[driverLocation.lat, driverLocation.lng]}
-                    zoom={13}
-                  />
-                )}
-              </MapContainer>
+            {showMap && (
+              <TripMap
+                driverLocation={driverLocation}
+                fromCoords={fromCoords}
+                toCoords={toCoords}
+                routePoints={routePoints}
+                trip={trip}
+              />
             )}
           </MapWrapper>
         </Section>
