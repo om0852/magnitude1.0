@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function AccountPage() {
   const [activeSection, setActiveSection] = useState('profile');
@@ -8,6 +8,7 @@ export default function AccountPage() {
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [showEditAddressModal, setShowEditAddressModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
+  const [savedAddresses, setSavedAddresses] = useState([]);
   const [newAddress, setNewAddress] = useState({
     label: '',
     streetAddress: '',
@@ -20,7 +21,7 @@ export default function AccountPage() {
   const fileInputRef = useRef(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
-    oldPassword: '',
+    currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
@@ -59,11 +60,6 @@ export default function AccountPage() {
       { id: 2, type: 'debit', amount: 200, description: 'Ride payment', date: '2024-03-19', status: 'completed' },
       { id: 3, type: 'credit', amount: 1000, description: 'Referral bonus', date: '2024-03-18', status: 'completed' },
       { id: 4, type: 'debit', amount: 300, description: 'Ride payment', date: '2024-03-17', status: 'completed' }
-    ],
-    savedAddresses: [
-      { id: 1, label: "Home", address: "123 Main Street, Apartment 4B" },
-      { id: 2, label: "Office", address: "456 Business Park, Building C" },
-      { id: 3, label: "Gym", address: "789 Fitness Avenue" }
     ],
     preferences: {
       notifications: true,
@@ -119,15 +115,29 @@ export default function AccountPage() {
     </button>
   );
 
-  const handleAddAddress = (e) => {
+  const handleAddAddress = async (e) => {
     e.preventDefault();
-    // In a real app, this would make an API call to save the address
-    userData.savedAddresses.push({
-      id: userData.savedAddresses.length + 1,
-      ...newAddress
-    });
-    setNewAddress({ label: '', streetAddress: '', city: '', state: '', pincode: '', landmark: '', instructions: '' });
-    setShowAddAddressModal(false);
+    try {
+      const response = await fetch('/api/address', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newAddress),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add address');
+      }
+
+      const data = await response.json();
+      setSavedAddresses(prev => [...prev, data]);
+      setNewAddress({ label: '', streetAddress: '', city: '', state: '', pincode: '', landmark: '', instructions: '' });
+      setShowAddAddressModal(false);
+    } catch (error) {
+      console.error('Error adding address:', error);
+      alert('Failed to add address. Please try again.');
+    }
   };
 
   const handleEditAddress = (address) => {
@@ -135,16 +145,182 @@ export default function AccountPage() {
     setShowEditAddressModal(true);
   };
 
-  const handleUpdateAddress = (e) => {
+  const handleUpdateAddress = async (e) => {
     e.preventDefault();
-    // In a real app, this would make an API call to update the address
-    const updatedAddresses = userData.savedAddresses.map(addr => 
-      addr.id === editingAddress.id ? editingAddress : addr
-    );
-    userData.savedAddresses = updatedAddresses;
-    setShowEditAddressModal(false);
-    setEditingAddress(null);
+    try {
+      const response = await fetch('/api/address', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingAddress._id,
+          ...editingAddress
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update address');
+      }
+
+      const updatedAddress = await response.json();
+      setSavedAddresses(prev => 
+        prev.map(addr => addr._id === updatedAddress._id ? updatedAddress : addr)
+      );
+      setShowEditAddressModal(false);
+      setEditingAddress(null);
+    } catch (error) {
+      console.error('Error updating address:', error);
+      alert('Failed to update address. Please try again.');
+    }
   };
+
+  const handleDeleteAddress = async (addressId) => {
+    try {
+      const response = await fetch(`/api/address?id=${addressId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete address');
+      }
+
+      setSavedAddresses(prev => prev.filter(addr => addr._id !== addressId));
+    } catch (error) {
+      console.error('Error deleting address:', error);
+      alert('Failed to delete address. Please try again.');
+    }
+  };
+
+  const fetchAddresses = async () => {
+    try {
+      const response = await fetch('/api/address');
+      if (!response.ok) {
+        throw new Error('Failed to fetch addresses');
+      }
+      const addresses = await response.json();
+      setSavedAddresses(addresses);
+    } catch (error) {
+      console.error('Error fetching addresses:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchAddresses();
+  }, []);
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      alert('New password and confirmation do not match');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      alert('New password must be at least 8 characters long');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/user/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to change password');
+      }
+
+      alert('Password changed successfully');
+      setShowPasswordModal(false);
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  const PasswordChangeModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-semibold text-gray-900">Change Password</h3>
+          <button 
+            onClick={() => {
+              setShowPasswordModal(false);
+              setPasswordData({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: ''
+              });
+            }}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handlePasswordChange} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1">
+              Current Password <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="password"
+              required
+              value={passwordData.currentPassword}
+              onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+              className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1">
+              New Password <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="password"
+              required
+              value={passwordData.newPassword}
+              onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+              className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Must be at least 8 characters long</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1">
+              Confirm New Password <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="password"
+              required
+              value={passwordData.confirmPassword}
+              onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors duration-200"
+          >
+            Change Password
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 
   const AddressModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -408,119 +584,6 @@ export default function AccountPage() {
     </div>
   );
 
-  const PasswordChangeModal = () => {
-    const handlePasswordChange = (e) => {
-      e.preventDefault();
-      
-      // Validate passwords
-      if (!passwordData.oldPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-        alert('All fields are required');
-        return;
-      }
-
-      if (passwordData.newPassword !== passwordData.confirmPassword) {
-        alert('New passwords do not match');
-        return;
-      }
-
-      if (passwordData.newPassword.length < 8) {
-        alert('New password must be at least 8 characters long');
-        return;
-      }
-
-      // Here you would make an API call to verify old password and update to new password
-      // For now, we'll simulate a successful password change
-      alert('Password changed successfully!');
-      setShowPasswordModal(false);
-      setPasswordData({
-        oldPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-    };
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-xl p-6 w-full max-w-md">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-xl font-semibold text-gray-900">Change Password</h3>
-            <button 
-              onClick={() => {
-                setShowPasswordModal(false);
-                setPasswordData({
-                  oldPassword: '',
-                  newPassword: '',
-                  confirmPassword: ''
-                });
-              }}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <form onSubmit={handlePasswordChange} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Current Password <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                required
-                placeholder="Enter your current password"
-                value={passwordData.oldPassword}
-                onChange={(e) => setPasswordData(prev => ({ ...prev, oldPassword: e.target.value }))}
-                className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-black"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                New Password <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                required
-                placeholder="Enter new password"
-                value={passwordData.newPassword}
-                onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-black"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Confirm New Password <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                required
-                placeholder="Confirm new password"
-                value={passwordData.confirmPassword}
-                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-black"
-              />
-            </div>
-
-            <div className="pt-4">
-              <button
-                type="submit"
-                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-300 flex items-center justify-center gap-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Change Password
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  };
-
   const renderSection = () => {
     switch (activeSection) {
       case 'profile':
@@ -585,36 +648,7 @@ export default function AccountPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">Saved Addresses</h3>
-                  <button 
-                    onClick={() => setShowAddAddressModal(true)}
-                    className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center gap-1"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Add New
-                  </button>
-                </div>
-                <div className="space-y-3">
-                  {userData.savedAddresses.map(address => (
-                    <div key={address.id} className="bg-purple-50 rounded-xl p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-gray-900">{address.label}</span>
-                        <button 
-                          onClick={() => handleEditAddress(address)}
-                          className="text-purple-600 hover:text-purple-700"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
-                      </div>
-                      <p className="text-gray-600 text-sm">{address.address}</p>
-                    </div>
-                  ))}
-                </div>
+                {renderAddressSection()}
               </div>
             </div>
           </div>
@@ -1098,40 +1132,30 @@ export default function AccountPage() {
       case 'security':
         return (
           <div className="space-y-6">
-            {showPasswordModal && <PasswordChangeModal />}
-            <h2 className="text-2xl font-bold text-gray-900">Security Settings</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Password & Security</h3>
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Password</h3>
-                <div className="bg-purple-50 rounded-xl p-4 space-y-4">
+                <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
+                  <div>
+                    <h4 className="font-medium text-gray-900">Password</h4>
+                    <p className="text-sm text-gray-600">Last changed: 30 days ago</p>
+                  </div>
                   <button
                     onClick={() => setShowPasswordModal(true)}
-                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-300 flex items-center justify-center gap-2"
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                    </svg>
                     Change Password
                   </button>
-                  <p className="text-sm text-gray-600">
-                    Last changed: 30 days ago
-                  </p>
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Two-Factor Authentication</h3>
-                <div className="bg-purple-50 rounded-xl p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900">Enable 2FA</p>
-                      <p className="text-sm text-gray-600">Add an extra layer of security</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
+                <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg">
+                  <div>
+                    <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
+                    <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
                   </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
                 </div>
               </div>
             </div>
@@ -1250,8 +1274,71 @@ export default function AccountPage() {
     }
   };
 
+  const renderAddressSection = () => (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-900">Saved Addresses</h3>
+        <button 
+          onClick={() => setShowAddAddressModal(true)}
+          className="text-purple-600 hover:text-purple-700 font-medium text-sm flex items-center gap-1"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          Add New
+        </button>
+      </div>
+      <div className="space-y-3">
+        {savedAddresses.map(address => (
+          <div key={address._id} className="bg-purple-50 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900">{address.label}</span>
+                {address.isDefault && (
+                  <span className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs">Default</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => handleEditAddress(address)}
+                  className="text-purple-600 hover:text-purple-700"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+                <button 
+                  onClick={() => handleDeleteAddress(address._id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1 text-sm text-gray-600">
+              <p>{address.streetAddress}</p>
+              <p>{address.city}, {address.state} - {address.pincode}</p>
+              {address.landmark && <p>Landmark: {address.landmark}</p>}
+              {address.instructions && (
+                <p className="text-gray-500 italic mt-2">{address.instructions}</p>
+              )}
+            </div>
+          </div>
+        ))}
+        {savedAddresses.length === 0 && (
+          <div className="text-center py-6 bg-purple-50 rounded-xl">
+            <p className="text-gray-500">No addresses saved yet</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-100">
+      {showPasswordModal && <PasswordChangeModal />}
       <div className="max-w-6xl mx-auto p-6">
         <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
