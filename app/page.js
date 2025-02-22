@@ -67,7 +67,7 @@ export default function Home() {
         <div className="bg-white p-4 shadow-md">
           <div className="max-w-xl mx-auto">
             <button 
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={() => router.push('/book-ride')}
               className="w-full bg-purple-50 rounded-lg shadow-lg p-4 flex items-center space-x-4 hover:bg-purple-100 transition-all"
             >
               <div className="p-2 bg-purple-100 rounded-full">
@@ -127,7 +127,10 @@ export default function Home() {
          
             <h2 className="text-xl text-purple-900 font-semibold mb-4">Plan your next trip</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <button className="relative h-48 w-full group overflow-hidden rounded-lg">
+              <button 
+                onClick={() => router.push('/book-ride?to=Goa, India')}
+                className="relative h-48 w-full group overflow-hidden rounded-lg"
+              >
                 <Image
                   src="/beach.jpg"
                   alt="Beach destination"
@@ -140,7 +143,10 @@ export default function Home() {
                   <p className="text-sm text-purple-100">Perfect for weekend</p>
                 </div>
               </button>
-              <button className="relative h-48 w-full group overflow-hidden rounded-lg">
+              <button 
+                onClick={() => router.push('/book-ride?to=Mahabaleshwar, Satara, Maharashtra, 412806, India')}
+                className="relative h-48 w-full group overflow-hidden rounded-lg"
+              >
                 <Image
                   src="/hill-station.jpg"
                   alt="Hill station"
@@ -153,7 +159,10 @@ export default function Home() {
                   <p className="text-sm text-purple-100">Scenic mountain views</p>
                 </div>
               </button>
-              <button className="relative h-48 w-full group overflow-hidden rounded-lg">
+              <button 
+                onClick={() => router.push('/book-ride?to=Mumbai, Maharashtra, India')}
+                className="relative h-48 w-full group overflow-hidden rounded-lg"
+              >
                 <Image
                   src="/city.jpg"
                   alt="City tour"
@@ -166,7 +175,10 @@ export default function Home() {
                   <p className="text-sm text-purple-100">Explore urban life</p>
                 </div>
               </button>
-              <button className="relative h-48 w-full group overflow-hidden rounded-lg">
+              <button 
+                onClick={() => router.push('/book-ride?to=Tirupati, Nethaji Road, Tirupati, Tirupati (Urban), Tirupati, Andhra Pradesh, 517500, India')}
+                className="relative h-48 w-full group overflow-hidden rounded-lg"
+              >
                 <Image
                   src="/temple.jpg"
                   alt="Temple visit"
