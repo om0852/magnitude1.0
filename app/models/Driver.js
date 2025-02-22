@@ -11,6 +11,14 @@ const driverSchema = new mongoose.Schema({
     unique: true,
     lowercase: true
   },
+  driverId: {
+
+    type: String,
+
+    unique: true,
+
+    sparse: true,
+  },
   phone: {
     type: String,
     required: [true, 'Phone number is required']
