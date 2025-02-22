@@ -6,144 +6,211 @@ import Image from 'next/image';
 export default function Home() {
   const [pickupLocation, setPickupLocation] = useState('');
   const [dropLocation, setDropLocation] = useState('');
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const suggestions = [
+    {
+      id: 1,
+      title: 'Trip',
+      icon: '/taxi.png',
+      isPromo: true,
+    },
+    {
+      id: 2,
+      title: 'Auto',
+      icon: '/electric-car.png',
+      isPromo: false,
+    },
+    {
+      id: 3,
+      title: 'Intercity',
+      icon: '/suv.png',
+      isPromo: false,
+    },
+    {
+      id: 4,
+      title: 'Reserve',
+      icon: '/reserve-icon.svg',
+      isPromo: false,
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <div className="relative h-[600px]">
-        {/* Background Image */}
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-900/90 to-purple-700/90">
-          <Image
-            src="/hero-bg.jpg"
-            alt="City streets"
-            fill
-            className="object-cover mix-blend-overlay"
-            priority
-          />
+    <div className="min-h-screen bg-white relative">
+      {/* Map Section - Takes full screen */}
+      <div className="fixed inset-0 bg-gray-200">
+        <Image
+          src="/map-bg.jpg"
+          alt="Map"
+          fill
+          className="object-cover"
+          priority
+        />
+      </div>
+
+      {/* Main Content - Floating UI */}
+      <div className="relative min-h-screen pt-16">
+        {/* Top Bar */}
+        <div className="bg-white p-4 shadow-md">
+          <div className="max-w-xl mx-auto">
+            <button 
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="w-full bg-white rounded-lg shadow-lg p-4 flex items-center space-x-4"
+            >
+              <div className="p-2 bg-gray-100 rounded-full">
+                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <span className="text-gray-500">Where to?</span>
+            </button>
+          </div>
         </div>
 
-        {/* Hero Content */}
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
-          <div className="flex flex-col justify-center h-full pb-32">
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">
-              Your Ride, Your Way
-            </h1>
-            <p className="text-xl text-white/90 mb-8 max-w-2xl">
-              Experience seamless transportation with Ride90. Book your ride now and enjoy comfortable, safe, and reliable journeys across the city.
-            </p>
-            
-            {/* Booking Card */}
-            <div className="bg-white rounded-lg shadow-xl p-6 max-w-2xl">
-              <h2 className="text-2xl font-semibold text-gray-800 mb-4">Book Your Ride</h2>
+        {/* Suggestions Section */}
+        <div className="bg-purple-900 mt-4 p-6">
+          <div className="max-w-xl mx-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl text-white font-semibold">Suggestions</h2>
+              <button className="text-white hover:text-purple-200">See all</button>
+            </div>
+            <div className="grid grid-cols-4 gap-4">
+              {suggestions.map((suggestion) => (
+                <button key={suggestion.id} className="relative bg-purple-800/50 backdrop-blur-sm rounded-lg p-4 text-center hover:bg-purple-700/50 transition duration-300">
+                  {suggestion.isPromo && (
+                    <div className="absolute top-2 left-2">
+                      <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">
+                        Promo
+                      </span>
+                    </div>
+                  )}
+                  <div className="h-24 relative mb-2">
+                    <Image
+                      src={suggestion.icon}
+                      alt={suggestion.title}
+                      width={96}
+                      height={96}
+                      className="object-contain mx-auto"
+                    />
+                  </div>
+                  <span className="text-white text-sm">{suggestion.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white mt-4 mx-4 p-4 rounded-lg shadow-lg">
+          <div className="flex space-x-4 overflow-x-auto pb-2">
+            <button className="flex-shrink-0 flex flex-col items-center space-y-2">
+              <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+              </div>
+              <span className="text-sm text-gray-600">Home</span>
+            </button>
+            <button className="flex-shrink-0 flex flex-col items-center space-y-2">
+              <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <span className="text-sm text-gray-600">Work</span>
+            </button>
+            <button className="flex-shrink-0 flex flex-col items-center space-y-2">
+              <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+              </div>
+              <span className="text-sm text-gray-600">Saved</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Expanded Search Panel */}
+        {isExpanded && (
+          <div className="fixed inset-0 bg-white z-50">
+            <div className="p-4">
+              <div className="flex items-center mb-4">
+                <button 
+                  onClick={() => setIsExpanded(false)}
+                  className="p-2 hover:bg-gray-100 rounded-full"
+                >
+                  <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <h2 className="ml-4 text-xl font-semibold">Where to?</h2>
+              </div>
+              
               <div className="space-y-4">
-                <div>
-                  <label htmlFor="pickup" className="block text-sm font-medium text-gray-700">Pickup Location</label>
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -mt-2">
+                    <div className="w-4 h-4 bg-purple-700 rounded-full"></div>
+                  </div>
                   <input
                     type="text"
-                    id="pickup"
                     value={pickupLocation}
                     onChange={(e) => setPickupLocation(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    placeholder="Enter pickup location"
+                    placeholder="Pickup location"
+                    className="pl-12 pr-4 py-3 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   />
                 </div>
-                <div>
-                  <label htmlFor="drop" className="block text-sm font-medium text-gray-700">Drop Location</label>
+                
+                <div className="relative">
+                  <div className="absolute left-4 top-1/2 -mt-2">
+                    <div className="w-4 h-4 bg-purple-900 rounded-full"></div>
+                  </div>
                   <input
                     type="text"
-                    id="drop"
                     value={dropLocation}
                     onChange={(e) => setDropLocation(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                    placeholder="Enter drop location"
+                    placeholder="Where to?"
+                    className="pl-12 pr-4 py-3 w-full border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   />
                 </div>
-                <button className="w-full bg-purple-700 text-white py-3 px-6 rounded-md hover:bg-purple-800 transition duration-300">
-                  Book Now
-                </button>
+              </div>
+
+              {/* Recent Locations */}
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-gray-500 mb-4">RECENT LOCATIONS</h3>
+                <div className="space-y-4">
+                  {[
+                    { name: 'Home', address: '123 Home Street', icon: 'home' },
+                    { name: 'Work', address: '456 Office Avenue', icon: 'work' },
+                    { name: 'Mall', address: '789 Shopping Center', icon: 'location' },
+                  ].map((location, index) => (
+                    <button key={index} className="w-full flex items-center space-x-4 p-2 hover:bg-gray-50 rounded-lg">
+                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="font-medium">{location.name}</div>
+                        <div className="text-sm text-gray-500">{location.address}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Features Section */}
-      <div className="py-24 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose Ride90?</h2>
-            <p className="text-xl text-gray-600">Experience the best ride-sharing service in town</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            {/* Feature 1 */}
-            <div className="text-center group">
-              <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center transition duration-300 group-hover:bg-purple-200">
-                <svg className="w-8 h-8 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Quick Pickup</h3>
-              <p className="text-gray-600">Get picked up within minutes of booking your ride</p>
-            </div>
-
-            {/* Feature 2 */}
-            <div className="text-center group">
-              <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center transition duration-300 group-hover:bg-purple-200">
-                <svg className="w-8 h-8 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Best Rates</h3>
-              <p className="text-gray-600">Competitive prices with no hidden charges</p>
-            </div>
-
-            {/* Feature 3 */}
-            <div className="text-center group">
-              <div className="w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full flex items-center justify-center transition duration-300 group-hover:bg-purple-200">
-                <svg className="w-8 h-8 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Safe Rides</h3>
-              <p className="text-gray-600">Verified drivers and secure ride tracking</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Download App Section */}
-      <div className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900 mb-6">Download Our App</h2>
-              <p className="text-xl text-gray-600 mb-8">
-                Get the full Ride90 experience by downloading our mobile app. Available for both iOS and Android devices.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <button className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-700 hover:bg-purple-800 transition duration-300">
-                  <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17.112 0H6.888C3.088 0 0 3.088 0 6.888v10.224C0 20.912 3.088 24 6.888 24h10.224C20.912 24 24 20.912 24 17.112V6.888C24 3.088 20.912 0 17.112 0zM12 18.75c-3.728 0-6.75-3.022-6.75-6.75S8.272 5.25 12 5.25 18.75 8.272 18.75 12s-3.022 6.75-6.75 6.75z"/>
-                  </svg>
-                  App Store
-                </button>
-                <button className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-700 hover:bg-purple-800 transition duration-300">
-                  <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M22.018 13.298l-3.919 2.25-3.515-3.493 3.543-3.521 3.891 2.26c.217.125.35.354.35.603s-.133.478-.35.603zM1.337.924a.8.8 0 00-.337.662v20.828c0 .276.135.535.359.662l9.891-9.891L1.337.924zM12.75 13.252l3.045 3.024 3.521-2.027-3.04-3.008-3.526 2.011zM12.159 12.664L2.297 22.515a.801.801 0 00.402.11.802.802 0 00.401-.11L12.92 17.5l-3.516-3.493 2.755-2.343z"/>
-                  </svg>
-                  Play Store
-                </button>
-              </div>
-            </div>
-            <div className="relative h-[400px]">
-              <Image
-                src="/app-preview.jpg"
-                alt="Ride90 App Preview"
-                fill
-                className="object-contain"
-              />
-            </div>
+        {/* Bottom Navigation */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
+          <div className="max-w-xl mx-auto">
+            <button className="w-full bg-purple-700 text-white py-4 px-6 rounded-lg font-medium hover:bg-purple-800 transition duration-300 flex items-center justify-center space-x-2">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              <span>Choose Ride</span>
+            </button>
           </div>
         </div>
       </div>
