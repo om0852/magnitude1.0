@@ -67,7 +67,7 @@ export default function Home() {
         <div className="bg-white p-4 shadow-md">
           <div className="max-w-xl mx-auto">
             <button 
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={() => router.push('/book-ride')}
               className="w-full bg-purple-50 rounded-lg shadow-lg p-4 flex items-center space-x-4 hover:bg-purple-100 transition-all"
             >
               <div className="p-2 bg-purple-100 rounded-full">

@@ -223,7 +223,7 @@ const Navbar = () => {
 
                         <DesktopMenu>
                             <StyledLink href="/" $isActive={pathname === "/"}>Home</StyledLink>
-                            <StyledLink href="/service" $isActive={pathname === "/service"}>Service</StyledLink>
+                            <StyledLink href="/book-ride" $isActive={pathname === "/book-ride"}>Book Ride</StyledLink>
                             <StyledLink href="/activity" $isActive={pathname === "/activity"}>Activity</StyledLink>
                             <StyledLink href="/account" $isActive={pathname === "/account"}>Account</StyledLink>
                             <StyledLink href="/about" $isActive={pathname === "/about"}>About Us</StyledLink>
@@ -263,7 +263,7 @@ const Navbar = () => {
             <MobileMenu $isOpen={isMenuOpen}>
                 <MobileMenuContent>
                     <MobileLink href="/">Home</MobileLink>
-                    <MobileLink href="/service">Service</MobileLink>
+                    <MobileLink href="/book-ride">Book Ride</MobileLink>
                     <MobileLink href="/activity">Activity</MobileLink>
                     <MobileLink href="/account">Account</MobileLink>
                     <MobileLink href="/settings">Settings</MobileLink>
