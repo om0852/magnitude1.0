@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
-import { FaCar, FaMapMarkerAlt, FaClock, FaMoneyBillWave, FaStar } from 'react-icons/fa';
+import { FaCar, FaMapMarkerAlt, FaClock, FaMoneyBillWave, FaStar, FaUser } from 'react-icons/fa';
 import axios from 'axios';
 
 const PageContainer = styled.div`
@@ -184,29 +184,111 @@ const EmptyState = styled.div`
   }
 `;
 
+const DriverInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #E5E7EB;
+
+  .driver-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #E5E7EB;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6D28D9;
+  }
+
+  .driver-details {
+    flex: 1;
+
+    .name {
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .vehicle {
+      font-size: 0.875rem;
+      color: #6B7280;
+    }
+  }
+
+  .rating {
+    text-align: right;
+    
+    .stars {
+      color: #F59E0B;
+      font-weight: 600;
+    }
+    
+    .rides {
+      font-size: 0.75rem;
+      color: #6B7280;
+    }
+  }
+`;
+
+const OtpDisplay = styled.div`
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #F8F7FF;
+  border-radius: 0.5rem;
+  text-align: center;
+
+  .otp {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #4C1D95;
+    letter-spacing: 0.5rem;
+    margin: 0.5rem 0;
+  }
+
+  .label {
+    font-size: 0.875rem;
+    color: #6B7280;
+  }
+`;
+
 export default function Activity() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    console.log('Session status:', status);
     if (status === 'unauthenticated') {
       router.push('/login');
       return;
     }
 
-    fetchTrips();
-  }, [status, router]);
+    if (status === 'authenticated') {
+      console.log('User email:', session?.user?.email);
+      fetchTrips();
+    }
+  }, [status, router, session]);
 
   const fetchTrips = async () => {
     try {
       setLoading(true);
+      setError(null);
+      console.log('Fetching trips...');
       const response = await axios.get('/api/trips');
-      setTrips(response.data.data);
+      console.log('API Response:', response.data);
+      if (response.data.success) {
+        setTrips(response.data.data);
+      } else {
+        setError(response.data.error || 'Failed to fetch trips');
+      }
     } catch (error) {
       console.error('Error fetching trips:', error);
+      setError(error.response?.data?.error || error.message || 'Failed to fetch trips');
     } finally {
       setLoading(false);
     }
@@ -241,21 +323,47 @@ export default function Activity() {
     }
   };
 
-  if (loading) {
+  const renderDriverInfo = (trip) => {
+    if (!trip.driverDetails) return null;
+
+    return (
+      <DriverInfo>
+        <div className="driver-avatar">
+          <FaUser size={24} />
+        </div>
+        <div className="driver-details">
+          <div className="name">{trip.driverDetails.name}</div>
+          <div className="vehicle">
+            {trip.driverDetails.vehicleModel} • {trip.driverDetails.vehicleNumber}
+          </div>
+        </div>
+        <div className="rating">
+          <div className="stars">⭐ {trip.driverDetails.rating.toFixed(1)}</div>
+          <div className="rides">{trip.driverDetails.totalRides} rides</div>
+        </div>
+      </DriverInfo>
+    );
+  };
+
+  if (error) {
     return (
       <PageContainer>
         <ContentWrapper>
-          <div className="animate-pulse">
-            <Header>
-              <div className="h-8 w-64 bg-gray-200 rounded mb-4"></div>
-              <div className="h-4 w-48 bg-gray-200 rounded"></div>
-            </Header>
-            {[1, 2, 3].map(i => (
-              <TripCard key={i}>
-                <div className="h-24 bg-gray-100 rounded mb-4"></div>
-              </TripCard>
-            ))}
-          </div>
+          <Header>
+            <h1>Your Trips</h1>
+            <p>View and manage all your ride activities</p>
+          </Header>
+          <EmptyState>
+            <FaCar />
+            <h3>Error Loading Trips</h3>
+            <p>{error}</p>
+            <button 
+              onClick={fetchTrips}
+              className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Try Again
+            </button>
+          </EmptyState>
         </ContentWrapper>
       </PageContainer>
     );
@@ -357,6 +465,15 @@ export default function Activity() {
                   </div>
                 )}
               </TripDetails>
+
+              {renderDriverInfo(trip)}
+
+              {trip.status === 'in_progress' && trip.otp && (
+                <OtpDisplay>
+                  <div className="label">Share this OTP with your driver</div>
+                  <div className="otp">{trip.otp}</div>
+                </OtpDisplay>
+              )}
             </TripCard>
           ))
         )}

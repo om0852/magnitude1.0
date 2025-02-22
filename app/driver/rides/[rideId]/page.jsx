@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import axios from 'axios';
 import io from 'socket.io-client';
+import toast from 'react-hot-toast';
 
 const RideDetails = ({ params }) => {
   const { rideId } = use(params);
@@ -11,6 +12,7 @@ const RideDetails = ({ params }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [socket, setSocket] = useState(null);
+  const [isVerified, setIsVerified] = useState(false);
 
   useEffect(() => {
     console.log('RideId from params:', rideId);
@@ -67,6 +69,7 @@ const RideDetails = ({ params }) => {
       const response = await axios.get(`/api/driver/rides/${rideId}`);
       console.log('Fetched ride data:', response.data);
       setRide(response.data.data);
+      setIsVerified(response.data.data.status === 'IN_PROGRESS');
       setLoading(false);
     } catch (err) {
       console.error('API Error:', err);
@@ -75,7 +78,7 @@ const RideDetails = ({ params }) => {
     }
   };
 
-  const verifyOTP = async () => {
+  const handleOtpSubmit = async () => {
     try {
       if (otpInput.length !== 4) {
         setError('Please enter a 4-digit OTP');
@@ -87,6 +90,8 @@ const RideDetails = ({ params }) => {
       });
 
       if (response.data.success) {
+        setIsVerified(true);
+        toast.success('OTP verified successfully!');
         fetchRideDetails();
         setOtpInput('');
       } else {
@@ -130,6 +135,31 @@ const RideDetails = ({ params }) => {
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white p-8">
             <h1 className="text-3xl font-bold mb-2">Ride Details</h1>
+            {!isVerified && (
+              <div className="mb-6 p-6 bg-white/20 backdrop-blur-sm rounded-xl">
+                <h2 className="text-xl font-semibold mb-4">Verify Ride OTP</h2>
+                <div className="flex items-center space-x-4">
+                  <input
+                    type="text"
+                    maxLength="4"
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    placeholder="Enter 4-digit OTP"
+                    className="w-full px-4 py-2 text-lg font-mono tracking-wider text-purple-900 bg-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <button
+                    onClick={handleOtpSubmit}
+                    disabled={otpInput.length !== 4}
+                    className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  >
+                    Verify
+                  </button>
+                </div>
+                <p className="text-sm mt-2 text-white/80">
+                  Ask the passenger for the 4-digit OTP to start the ride
+                </p>
+              </div>
+            )}
             <div className="flex items-center space-x-3">
               <div className="px-4 py-1.5 bg-white/20 rounded-full text-sm backdrop-blur-sm">
                 Status: {ride.status}
@@ -225,30 +255,6 @@ const RideDetails = ({ params }) => {
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* OTP Verification Section */}
-            <div className="mb-8">
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-100">
-                <h3 className="text-xl font-semibold mb-4 text-purple-900">Verify Passenger OTP</h3>
-                <div className="flex gap-3">
-                  <input
-                    type="number"
-                    maxLength="4"
-                    className="border border-purple-200 p-3 rounded-lg w-36 text-center text-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    value={otpInput}
-                    onChange={(e) => setOtpInput(e.target.value)}
-                    placeholder="Enter OTP"
-                  />
-                  <button
-                    onClick={verifyOTP}
-                    className="bg-purple-600 text-white px-8 py-3 rounded-lg hover:bg-purple-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-                  >
-                    Verify
-                  </button>
-                </div>
-                {error && <p className="text-red-500 mt-3">{error}</p>}
               </div>
             </div>
 

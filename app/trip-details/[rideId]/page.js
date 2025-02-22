@@ -9,6 +9,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import Image from 'next/image';
 import io from 'socket.io-client';
+import { useRef } from 'react';
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -41,6 +42,45 @@ const TripHeader = styled.div`
     padding: 0.5rem 1rem;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 2rem;
+    font-size: 0.875rem;
+  }
+`;
+
+const OtpSection = styled.div`
+  padding: 1.5rem;
+  background: #F8F7FF;
+  border-bottom: 1px solid #E5E7EB;
+  text-align: center;
+
+  h3 {
+    color: #4C1D95;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+  }
+
+  .otp-display {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+
+    .digit {
+      width: 3rem;
+      height: 3.5rem;
+      background: white;
+      border: 2px solid #6D28D9;
+      border-radius: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #4C1D95;
+    }
+  }
+
+  .instruction {
+    color: #6B7280;
     font-size: 0.875rem;
   }
 `;
@@ -296,6 +336,8 @@ export default function TripDetails({ params }) {
   });
   const [driverLocation, setDriverLocation] = useState(null);
   const [socket, setSocket] = useState(null);
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+  const mapRef = useRef(null);
 
   // Function to get user's current location
   const getCurrentLocation = () => {
@@ -498,6 +540,20 @@ export default function TripDetails({ params }) {
           <h1>Trip Details</h1>
           <div className="status-badge">{trip.status}</div>
         </TripHeader>
+
+        {trip.status === 'in_progress' && trip.otp && (
+          <OtpSection>
+            <h3>Share OTP with Driver</h3>
+            <div className="otp-display">
+              {trip.otp.split('').map((digit, index) => (
+                <div key={index} className="digit">{digit}</div>
+              ))}
+            </div>
+            <p className="instruction">
+              Please share this OTP with your driver to start the ride
+            </p>
+          </OtpSection>
+        )}
 
         <Section>
           <h2>Live Trip Stats</h2>

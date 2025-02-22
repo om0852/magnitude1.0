@@ -36,6 +36,11 @@ const rideSchema = new mongoose.Schema({
   socketId: {
     type: String,
   },
+  otp: {
+    type: String,
+    required: true,
+    length: 4
+  },
   pickupLocation: {
     lat: {
       type: Number,
@@ -115,7 +120,8 @@ export async function POST(req) {
 
     await connectDB();
     const { rideId, tripRequest } = await req.json();
-console.log(tripRequest)
+    console.log(tripRequest)
+
     if (!rideId || !tripRequest) {
       return NextResponse.json({ error: 'Ride ID and trip request details are required' }, { status: 400 });
     }
@@ -125,6 +131,9 @@ console.log(tripRequest)
     if (!driver) {
       return NextResponse.json({ error: 'Driver not found' }, { status: 404 });
     }
+
+    // Generate 4-digit OTP
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
     // Check if ride already exists
     let ride = await Ride.findOne({ rideId });
@@ -136,6 +145,7 @@ console.log(tripRequest)
       ride.driverId = driver._id;
       ride.status = 'in_progress';
       ride.startTime = currentDate;
+      ride.otp = otp;
       await ride.save();
     } else {
       // Create new ride with validated data
@@ -153,7 +163,8 @@ console.log(tripRequest)
         vehicleType: tripRequest.vehicleType,
         estimatedFare: tripRequest.estimatedFare,
         userDetails: tripRequest.userDetails,
-        startTime: currentDate
+        startTime: currentDate,
+        otp: otp
       };
 
       console.log("Creating ride with data:", rideData);

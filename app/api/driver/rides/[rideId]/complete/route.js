@@ -6,7 +6,6 @@ export async function POST(request, context) {
   try {
     await connectDB();
     const { rideId } = context.params;
-    const { otp } = await request.json();
 
     const ride = await Ride.findOne({ rideId });
 
@@ -17,24 +16,26 @@ export async function POST(request, context) {
       );
     }
 
-    // Verify OTP
-    if (ride.otp !== otp) {
+    // Only allow completing rides that are in 'accepted' status
+    if (ride.status !== 'accepted') {
       return NextResponse.json(
-        { error: 'Invalid OTP' },
+        { error: 'Can only complete rides that are in accepted status' },
         { status: 400 }
       );
     }
 
-    // Update ride status
-    ride.status = 'in_progress';  // Changed from 'IN_PROGRESS' to 'in_progress'
+    // Update ride status to completed
+    ride.status = 'completed';
+    ride.endTime = new Date();
     await ride.save();
 
     return NextResponse.json({
       success: true,
-      message: 'OTP verified successfully',
+      message: 'Trip completed successfully',
       data: {
         rideId: ride.rideId,
-        status: ride.status
+        status: ride.status,
+        endTime: ride.endTime
       }
     });
 

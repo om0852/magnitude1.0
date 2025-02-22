@@ -11,6 +11,7 @@ import Image from 'next/image';
 import io from 'socket.io-client';
 import toast, { Toaster } from 'react-hot-toast';
 import RideRequestNotification from '../../components/RideRequestNotification';
+import { calculateDistance } from '../../utils/distance';
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -396,6 +397,8 @@ export default function DriverDashboard() {
     rating: 4.8
   });
   const [loading, setLoading] = useState(false);
+  const [currentDistance, setCurrentDistance] = useState(0);
+  const [currentDuration, setCurrentDuration] = useState(0);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -505,6 +508,7 @@ export default function DriverDashboard() {
         requestId: currentRequest.requestId || `REQ${Date.now()}`,
         userId: currentRequest.userId,
         socketId: currentRequest.socketId,
+        otp:Math.floor(100000 + Math.random() * 900000),
         pickupLocation: {
           lat: parseFloat(currentRequest.pickupLocation.lat),
           lng: parseFloat(currentRequest.pickupLocation.lng),
@@ -656,56 +660,91 @@ console.log("emitted ride accepted")
     }
   };
 
-  // Get and update location
-  useEffect(() => {
-    let locationWatcher = null;
+  // Add this function to calculate and update distance
+  const updateDistanceAndDuration = async (driverLocation, destination) => {
+    if (!driverLocation || !destination) return;
 
-    if (isOnline && socket) {
-      locationWatcher = navigator.geolocation.watchPosition(
-        async (position) => {
-          console.log('Location update received:', position.coords);
-          const location = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          setCurrentLocation(location);
-          
-          // Get address for the new location using OpenStreetMap
-          await getAddressFromCoordinates(location.lat, location.lng);
-          
-          // Send location update to socket server
-          socket.emit('updateLocation', location);
-        },
-        (error) => {
-          console.error('Location error:', error);
-          let errorMessage = 'Unable to get location';
-          switch (error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = 'Please enable location access to go online';
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Location information is unavailable';
-              break;
-            case error.TIMEOUT:
-              errorMessage = 'Location request timed out';
-              break;
-          }
-          toast.error(errorMessage);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 20000,
-          maximumAge: 0
-        }
+    try {
+      // Calculate straight-line distance
+      const distance = calculateDistance(
+        driverLocation.lat,
+        driverLocation.lng,
+        destination.lat,
+        destination.lng
       );
+
+      // Get route details from OSRM
+      const response = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${driverLocation.lng},${driverLocation.lat};${destination.lng},${destination.lat}?overview=false`
+      );
+      const data = await response.json();
+
+      if (data.code === 'Ok' && data.routes && data.routes[0]) {
+        const routeDistance = (data.routes[0].distance / 1000).toFixed(1); // Convert to km
+        const duration = Math.round(data.routes[0].duration / 60); // Convert to minutes
+        setCurrentDistance(routeDistance);
+        setCurrentDuration(duration);
+      } else {
+        // Fallback to straight-line distance if route calculation fails
+        setCurrentDistance(distance.toFixed(1));
+        setCurrentDuration(Math.round(distance * 3)); // Rough estimate
+      }
+    } catch (error) {
+      console.error('Error calculating distance:', error);
+      // Fallback to straight-line distance
+      const distance = calculateDistance(
+        driverLocation.lat,
+        driverLocation.lng,
+        destination.lat,
+        destination.lng
+      );
+      setCurrentDistance(distance.toFixed(1));
+      setCurrentDuration(Math.round(distance * 3)); // Rough estimate
     }
+  };
+
+  // Modify the location tracking useEffect
+  useEffect(() => {
+    if (!socket || !driverInfo) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (position) => {
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setCurrentLocation(location);
+        
+        // Get address for the new location
+        await getAddressFromCoordinates(location.lat, location.lng);
+        
+        // If there's an active ride, update distance
+        if (driverInfo.rideStatus?.isActive && driverInfo.rideStatus?.dropLocation) {
+          await updateDistanceAndDuration(location, driverInfo.rideStatus.dropLocation);
+        }
+
+        // Emit location update
+        socket.emit('driverLocationUpdate', {
+          ...location,
+          driverId: driverInfo._id,
+          timestamp: new Date().toISOString()
+        });
+      },
+      (error) => {
+        console.error('Location error:', error);
+        toast.error('Unable to get location');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
 
     return () => {
-      if (locationWatcher) {
-        navigator.geolocation.clearWatch(locationWatcher);
-      }
+      navigator.geolocation.clearWatch(watchId);
     };
-  }, [isOnline, socket]);
+  }, [socket, driverInfo]);
 
   const handleSettingsClick = () => {
     router.push('/driver/settings');
@@ -741,6 +780,20 @@ console.log("emitted ride accepted")
       status: "Completed"
     }
   ];
+
+  // Add LiveStats component in your return statement
+  const LiveStats = () => (
+    <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h3 className="text-sm text-gray-600">Current Distance</h3>
+        <p className="text-xl font-semibold text-purple-600">{currentDistance} km</p>
+      </div>
+      <div className="bg-white p-4 rounded-lg shadow">
+        <h3 className="text-sm text-gray-600">Estimated Time</h3>
+        <p className="text-xl font-semibold text-purple-600">{currentDuration} mins</p>
+      </div>
+    </div>
+  );
 
   if (status === 'loading') {
     return <PageContainer>Loading...</PageContainer>;
@@ -828,6 +881,8 @@ console.log("emitted ride accepted")
             </StatItem>
           </StatGrid>
         </EarningsCard>
+
+        {driverInfo?.rideStatus?.isActive && <LiveStats />}
 
         <Card>
           <h2>Performance Stats</h2>
