@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import styled from 'styled-components';
 
 const NavContainer = styled.nav`
@@ -63,66 +64,47 @@ const DesktopMenu = styled.div`
   @media (min-width: 768px) {
     display: flex;
     margin-left: 1.5rem;
-    gap: 1rem;
+    gap: 2rem;
     align-items: center;
-    background: rgba(0, 0, 0, 0.1);
-    padding: 0.5rem;
-    border-radius: 1rem;
-    backdrop-filter: blur(10px);
   }
 `;
 
 const StyledLink = styled(Link)`
   color: rgba(255, 255, 255, 0.9);
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
   font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
   transition: all 0.3s ease;
   position: relative;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
 
-  &::before {
+  &::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgba(255, 255, 255, 0.2),
-      transparent
-    );
-    transition: 0.5s;
+    bottom: 0;
+    left: 50%;
+    width: ${props => props.$isActive ? '80%' : '0'};
+    height: 2px;
+    background-color: white;
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
   }
+
+  ${props => props.$isActive && `
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+  `}
 
   &:hover {
     color: white;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.2);
     background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
 
-    &::before {
-      left: 100%;
+    &::after {
+      width: 80%;
     }
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-
-  &.active {
-    background: rgba(255, 255, 255, 0.15);
-    color: white;
-    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
   }
 `;
 
@@ -208,7 +190,7 @@ const MobileLoginButton = styled(LoginButton)`
 
 const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState('/');
+    const pathname = usePathname();
 
     return (
         <NavContainer>
@@ -223,11 +205,11 @@ const Navbar = () => {
                         </LogoWrapper>
 
                         <DesktopMenu>
-                            <StyledLink href="/" className={activeTab === '/' ? 'active' : ''} onClick={() => setActiveTab('/')}>Home</StyledLink>
-                            <StyledLink href="/service" className={activeTab === '/service' ? 'active' : ''} onClick={() => setActiveTab('/service')}>Service</StyledLink>
-                            <StyledLink href="/activity" className={activeTab === '/activity' ? 'active' : ''} onClick={() => setActiveTab('/activity')}>Activity</StyledLink>
-                            <StyledLink href="/account" className={activeTab === '/account' ? 'active' : ''} onClick={() => setActiveTab('/account')}>Account</StyledLink>
-                            <StyledLink href="/about" className={activeTab === '/about' ? 'active' : ''} onClick={() => setActiveTab('/about')}>About Us</StyledLink>
+                            <StyledLink href="/" $isActive={pathname === "/"}>Home</StyledLink>
+                            <StyledLink href="/service" $isActive={pathname === "/service"}>Service</StyledLink>
+                            <StyledLink href="/activity" $isActive={pathname === "/activity"}>Activity</StyledLink>
+                            <StyledLink href="/account" $isActive={pathname === "/account"}>Account</StyledLink>
+                            <StyledLink href="/about" $isActive={pathname === "/about"}>About Us</StyledLink>
                         </DesktopMenu>
                     </LogoContainer>
 
