@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
 import styled from 'styled-components';
 
 const NavContainer = styled.nav`
@@ -109,7 +110,7 @@ const StyledLink = styled(Link)`
 `;
 
 const LoginButton = styled.button`
-  background-color: white;
+  background-color: ${props => props.$isLoggedIn ? 'rgba(255, 255, 255, 0.9)' : 'white'};
   color: #6D28D9;
   padding: 0.5rem 1.5rem;
   border-radius: 9999px;
@@ -188,9 +189,27 @@ const MobileLoginButton = styled(LoginButton)`
   margin-top: 1rem;
 `;
 
+const UserInfo = styled.div`
+  color: white;
+  margin-right: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+`;
+
 const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
+    const { data: session, status } = useSession();
+
+    const handleLogin = () => {
+        router.push('/login');
+    };
+
+    const handleLogout = async () => {
+        await signOut({ redirect: false });
+        router.push('/');
+    };
 
     return (
         <NavContainer>
@@ -214,7 +233,18 @@ const Navbar = () => {
                     </LogoContainer>
 
                     <LoginButtonContainer>
-                        <LoginButton>Login</LoginButton>
+                        {status === 'authenticated' ? (
+                            <>
+                                <UserInfo>{session.user.name}</UserInfo>
+                                <LoginButton $isLoggedIn onClick={handleLogout}>
+                                    Logout
+                                </LoginButton>
+                            </>
+                        ) : (
+                            <LoginButton onClick={handleLogin}>
+                                Login
+                            </LoginButton>
+                        )}
                     </LoginButtonContainer>
 
                     <MobileMenuButton onClick={() => setIsMenuOpen(!isMenuOpen)}>
@@ -239,7 +269,20 @@ const Navbar = () => {
                     <MobileLink href="/activity">Activity</MobileLink>
                     <MobileLink href="/account">Account</MobileLink>
                     <MobileLink href="/about">About Us</MobileLink>
-                    <MobileLoginButton>Login</MobileLoginButton>
+                    {status === 'authenticated' ? (
+                        <>
+                            <div style={{ color: 'white', padding: '0.5rem 0.75rem' }}>
+                                {session.user.name}
+                            </div>
+                            <MobileLoginButton onClick={handleLogout}>
+                                Logout
+                            </MobileLoginButton>
+                        </>
+                    ) : (
+                        <MobileLoginButton onClick={handleLogin}>
+                            Login
+                        </MobileLoginButton>
+                    )}
                 </MobileMenuContent>
             </MobileMenu>
         </NavContainer>
