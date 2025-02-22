@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getSession } from 'next-auth/react';
+import { getSession, useSession } from 'next-auth/react';
 
 export default function ActivityPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [selectedRide, setSelectedRide] = useState(null);
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isContentVisible, setIsContentVisible] = useState(true);
@@ -17,16 +18,11 @@ export default function ActivityPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [activities, setActivities] = useState([]);
 
   // Fetch user rides data
   const fetchUserRides = async () => {
     try {
-      const session = await getSession();
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-
       const response = await fetch('/api/rides');
       if (!response.ok) {
         throw new Error('Failed to fetch rides');
@@ -55,6 +51,22 @@ export default function ActivityPage() {
     fetchUserRides();
   }, []);
 
+  // Fetch activities
+  const fetchActivities = async () => {
+    try {
+      const response = await fetch('/api/activities');
+      if (!response.ok) throw new Error('Failed to fetch activities');
+      const data = await response.json();
+      setActivities(data);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchActivities();
+  }, []);
+
   // Handle tab change with animation
   const handleTabChange = (tab) => {
     setIsContentVisible(false);
@@ -66,6 +78,25 @@ export default function ActivityPage() {
 
   const handleRideClick = (ride) => {
     router.push(`/activity/trip/${ride.id}`);
+  };
+
+  const handleActivityAction = async (id, action) => {
+    try {
+      const response = await fetch(`/api/activities/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action })
+      });
+
+      if (!response.ok) throw new Error('Failed to update activity');
+      
+      // Refresh activities after successful action
+      fetchActivities();
+    } catch (error) {
+      console.error('Error:', error);
+    }
   };
 
   const RideCard = ({ ride, type, index }) => (
@@ -254,6 +285,54 @@ export default function ActivityPage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-8 mt-8">
+        <h1 className="text-3xl font-bold mb-6">Your Activities</h1>
+        <div className="space-y-4">
+          {activities.map((activity) => (
+            <div 
+              key={activity.id} 
+              className="bg-white p-6 rounded-lg shadow-md"
+            >
+              {/* Activity details */}
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-lg font-semibold">
+                    {activity.status} - {activity.type}
+                  </p>
+                  <p className="text-gray-600">
+                    From: {activity.pickupLocation}
+                  </p>
+                  <p className="text-gray-600">
+                    To: {activity.dropoffLocation}
+                  </p>
+                  <p className="text-gray-600">
+                    {new Date(activity.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                
+                {/* Action buttons based on status */}
+                {activity.status === 'PENDING' && (
+                  <div className="space-x-2">
+                    <button
+                      onClick={() => handleActivityAction(activity.id, 'cancel')}
+                      className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleActivityAction(activity.id, 'complete')}
+                      className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                    >
+                      Complete
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </>
