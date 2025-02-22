@@ -556,7 +556,7 @@ export default function DriverDashboard() {
         contactNumber: driverInfo.phone,
         status: 'in_progress'
       });
-
+console.log("emitted ride accepted")
       // Clear the current request
       setCurrentRequest(null);
 

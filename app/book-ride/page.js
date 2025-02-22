@@ -691,14 +691,10 @@ const ConnectingText = styled.div`
 export default function BookRide() {
   const searchParams = useSearchParams();
   const vehicleType = parseInt(searchParams.get('type') || '1', 10);
-<<<<<<< HEAD
   const router = useRouter();
-=======
-  const presetDestination = searchParams.get('to');
->>>>>>> 0fb6d43e26bff09dfec6a349a4799bf2801b2628
   
   const [fromLocation, setFromLocation] = useState('');
-  const [toLocation, setToLocation] = useState(presetDestination || '');
+  const [toLocation, setToLocation] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [fromSuggestions, setFromSuggestions] = useState([]);
@@ -709,7 +705,7 @@ export default function BookRide() {
   const [fromCoords, setFromCoords] = useState(null);
   const [toCoords, setToCoords] = useState(null);
   const [routeDetails, setRouteDetails] = useState(null);
-  const [selectedVehicle, setSelectedVehicle] = useState(vehicleType); // Initialize with URL param
+  const [selectedVehicle, setSelectedVehicle] = useState(vehicleType);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [socket, setSocket] = useState(null);
@@ -870,11 +866,8 @@ export default function BookRide() {
   };
 
   useEffect(() => {
-    if (presetDestination) {
-      setToLocation(presetDestination);
-    }
     getCurrentLocation();
-  }, [presetDestination]);
+  }, []);
 
   // Function to get coordinates from address
   const getCoordinates = async (address) => {
@@ -965,18 +958,110 @@ export default function BookRide() {
       console.log('Connected to ride booking system');
     });
 
-    newSocket.on('nearbyDriversUpdated', (drivers) => {
-      console.log('Nearby drivers:', drivers);
-      setNearbyDrivers(drivers);
-    });
-
     newSocket.on('driverAccepted', (response) => {
       console.log('Driver accepted response:', response);
-      const { driverName, rideId, message, tripDetails } = response;
+      const { rideId, driverName, vehicleNumber, contactNumber, driverRating, driverPhoto, tripDetails } = response;
       
       setMatchedDriver(response);
       setSearchingForDriver(false);
       setIsConnecting(false);
+      
+      // Show success toast with driver details
+      toast.success(`${driverName} has accepted your ride request!`, {
+        duration: 5000,
+        icon: '🚗'
+      });
+      
+      // Play notification sound
+      try {
+        const audio = new Audio('/notification-sound.mp3');
+        audio.play();
+      } catch (e) {
+        console.log('Audio play failed:', e);
+      }
+      
+      // Navigate to trip details page after a short delay
+      setTimeout(() => {
+        router.push(`/trip-details/${rideId}`);
+      }, 2000);
+    });
+    newSocket.on('driverAccepted', (response) => {
+      console.log('Driver accepted response:', response);
+      const { rideId, driverName, vehicleNumber, contactNumber, driverRating, driverPhoto, tripDetails } = response;
+      
+      setMatchedDriver(response);
+      setSearchingForDriver(false);
+      setIsConnecting(false);
+      
+      // Show success toast with driver details
+      toast.success(`${driverName} has accepted your ride request!`, {
+        duration: 5000,
+        icon: '🚗'
+      });
+      
+      // Play notification sound
+      try {
+        const audio = new Audio('/notification-sound.mp3');
+        audio.play();
+      } catch (e) {
+        console.log('Audio play failed:', e);
+      }
+      
+      // Navigate to trip details page after a short delay
+      setTimeout(() => {
+        router.push(`/trip-details/${rideId}`);
+      }, 2000);
+    });
+
+    newSocket.on('tripRejected', (response) => {
+      const { message } = response;
+      setIsConnecting(false);
+      setSearchingForDriver(false);
+      toast.error(message || 'Driver rejected the trip request');
+    });
+
+    newSocket.on('noDriversAvailable', () => {
+      setIsConnecting(false);
+      setSearchingForDriver(false);
+      toast.error('No drivers available at the moment. Please try again later.');
+    });
+
+    // Cleanup on unmount
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, [router]);
+
+  // Update handleConfirmTrip function
+  const handleConfirmTrip = () => {
+    if (!fromCoords || !toCoords || !selectedVehicle) {
+      toast.error('Please select pickup, dropoff locations and vehicle type');
+      return;
+    }
+
+    setIsConfirming(true);
+    setIsConnecting(true);
+
+    // Initialize socket connection
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+
+    // Listen for nearby drivers updates
+    newSocket.on('nearbyDriversUpdated', (drivers) => {
+      console.log('Nearby drivers:', drivers);
+      if (drivers.length === 0) {
+        setIsConnecting(false);
+        toast.error('No drivers available nearby');
+      }
+    });
+
+    // Listen for driver acceptance
+    newSocket.on('driverAccepted', (response) => {
+      const { driverName, rideId, message } = response;
+      setIsConnecting(false);
+      setMatchedDriver(response);
       
       // Show success toast with driver details
       toast.success(message || `Driver ${driverName} has been assigned to your trip!`, {
@@ -984,7 +1069,7 @@ export default function BookRide() {
         icon: '🚗'
       });
       
-      // Play a notification sound
+      // Play notification sound
       try {
         const audio = new Audio('/notification-sound.mp3');
         audio.play();
@@ -998,72 +1083,26 @@ export default function BookRide() {
       }, 2000);
     });
 
-    newSocket.on('tripRejected', (response) => {
-      console.log('Trip rejected:', response);
-      const { message, status } = response;
-      
-      // Show rejection message
-      toast.error(message || 'Driver rejected the trip request', {
-        duration: 4000,
-        icon: '❌'
-      });
-
-      if (status === 'rejected') {
-        // If no other driver is being searched, reset the UI
-        setSearchingForDriver(false);
-        setIsConnecting(false);
-        setMatchedDriver(null);
-      }
-    });
-
-    newSocket.on('noDriversAvailable', () => {
-      setSearchingForDriver(false);
+    // Listen for trip rejection
+    newSocket.on('tripRejected', () => {
       setIsConnecting(false);
-      toast.error('No drivers available at the moment. Please try again later.', {
-        duration: 4000,
-        icon: '😕'
-      });
+      toast.error('Driver rejected the trip request');
     });
 
-    newSocket.on('driverLocation', (location) => {
-      if (matchedDriver) {
-        const updatedDriver = { ...matchedDriver, location };
-        setMatchedDriver(updatedDriver);
-      }
+    // Listen for no drivers available
+    newSocket.on('noDriversAvailable', () => {
+      setIsConnecting(false);
+      toast.error('No drivers available at the moment');
     });
-
-    // Cleanup on unmount
-    return () => {
-      if (newSocket) {
-        newSocket.disconnect();
-      }
-    };
-  }, [router]);
-
-  // Update handleConfirmTrip function
-  const handleConfirmTrip = () => {
-    if (!socket) {
-      toast.error('Unable to connect to booking system');
-      return;
-    }
-
-    if (!fromCoords || !toCoords || !selectedVehicle) {
-      toast.error('Please select pickup, dropoff locations and vehicle type');
-      return;
-    }
-
-    setIsConfirming(true);
-    setIsConnecting(true);
-    setSearchingForDriver(true);
 
     // First get nearby drivers
-    socket.emit('getNearbyDrivers', {
+    newSocket.emit('getNearbyDrivers', {
       lat: fromCoords[0],
       lng: fromCoords[1]
     });
 
-    // Emit trip request to server
-    socket.emit('requestTrip', {
+    // Emit trip request
+    newSocket.emit('requestTrip', {
       pickupLocation: {
         lat: fromCoords[0],
         lng: fromCoords[1],
@@ -1075,22 +1114,21 @@ export default function BookRide() {
         address: toLocation
       },
       vehicleType: selectedVehicle,
-      estimatedFare: routeDetails.fares.find(v => v.id === selectedVehicle)?.fare.total,
-      distance: routeDetails.distance,
-      duration: routeDetails.duration
+      estimatedFare: routeDetails?.fares.find(v => v.id === selectedVehicle)?.fare?.total || 0,
+      distance: routeDetails?.distance || 0,
+      duration: routeDetails?.duration || 0
     });
 
     toast.info('Searching for nearby drivers...');
   };
 
   const handleCancelTrip = () => {
-    if (socket && searchingForDriver) {
-      socket.emit('cancelTripRequest');
-    }
     setIsConfirming(false);
-    setIsConnecting(false);
-    setSearchingForDriver(false);
-    setMatchedDriver(null);
+    setIsConnecting(false); // Reset connecting state when trip is cancelled
+    if (socket) {
+      socket.disconnect();
+      setSocket(null);
+    }
   };
 
   return (

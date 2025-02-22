@@ -2,160 +2,284 @@
 
 import { useState, useEffect, use } from 'react';
 import axios from 'axios';
+import styled from 'styled-components';
+import { FaCar, FaUser, FaPhone, FaMapMarkerAlt, FaClock, FaMoneyBillWave } from 'react-icons/fa';
 import Image from 'next/image';
 
-const TripDetails = ({ params }) => {
-  const { rideId } = use(params);
-  const [ride, setRide] = useState(null);
-  const [error, setError] = useState('');
+const PageContainer = styled.div`
+  min-height: 100vh;
+  background: linear-gradient(to bottom right, #f8fafc, #f1f5f9);
+  padding: 2rem;
+`;
+
+const TripCard = styled.div`
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+`;
+
+const TripHeader = styled.div`
+  background: linear-gradient(135deg, #6D28D9, #4C1D95);
+  padding: 2rem;
+  color: white;
+  text-align: center;
+
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2rem;
+    font-size: 0.875rem;
+  }
+`;
+
+const Section = styled.div`
+  padding: 2rem;
+  border-bottom: 1px solid #f3f4f6;
+
+  h2 {
+    font-size: 1.25rem;
+    color: #4C1D95;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+`;
+
+const DriverInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: #f8f7ff;
+  border-radius: 0.75rem;
+
+  .avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6D28D9;
+  }
+
+  .details {
+    flex: 1;
+
+    h3 {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #1f2937;
+      margin-bottom: 0.25rem;
+    }
+
+    p {
+      color: #6b7280;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  }
+`;
+
+const LocationInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  .location-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f7ff;
+    border-radius: 0.75rem;
+
+    .icon {
+      color: #6D28D9;
+      margin-top: 0.25rem;
+    }
+
+    .text {
+      flex: 1;
+
+      h4 {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #4C1D95;
+        margin-bottom: 0.25rem;
+      }
+
+      p {
+        color: #6b7280;
+        font-size: 0.875rem;
+      }
+    }
+  }
+`;
+
+const TripStats = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+
+  .stat-item {
+    padding: 1rem;
+    background: #f8f7ff;
+    border-radius: 0.75rem;
+    text-align: center;
+
+    h4 {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-bottom: 0.5rem;
+    }
+
+    p {
+      font-size: 1.25rem;
+      color: #4C1D95;
+      font-weight: 600;
+    }
+  }
+`;
+
+export default function TripDetails({ params }) {
+  // Unwrap the params Promise using React.use()
+  const unwrappedParams = use(params);
+  const { rideId } = unwrappedParams;
+  
+  const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchRideDetails();
-  }, []);
+    const fetchTripDetails = async () => {
+      try {
+        const response = await axios.get(`/api/rides/${rideId}`);
+        setTrip(response.data.data);
+        setLoading(false);
+      } catch (err) {
+        setError('Failed to load trip details');
+        setLoading(false);
+      }
+    };
 
-  const fetchRideDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/rides/${rideId}`);
-      console.log('Fetched ride data:', response.data);
-      setRide(response.data.data);
-      setLoading(false);
-    } catch (err) {
-      console.error('API Error:', err);
-      setError(err.response?.data?.message || 'Failed to fetch trip details');
-      setLoading(false);
+    if (rideId) {
+      fetchTripDetails();
     }
-  };
+  }, [rideId]);
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
-      </div>
+      <PageContainer>
+        <div className="flex justify-center items-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
+        </div>
+      </PageContainer>
     );
   }
 
   if (error) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
-        <div className="text-red-500 text-center p-6 bg-white rounded-xl shadow-lg">
-          {error}
-        </div>
-      </div>
+      <PageContainer>
+        <div className="text-center text-red-600">{error}</div>
+      </PageContainer>
     );
   }
 
-  if (!ride) {
+  if (!trip) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
-        <div className="text-gray-500">No trip details found</div>
-      </div>
+      <PageContainer>
+        <div className="text-center">No trip details found</div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white p-8">
-            <h1 className="text-3xl font-bold mb-2">Trip Details</h1>
-            <div className="flex items-center space-x-3">
-              <div className="px-4 py-1.5 bg-white/20 rounded-full text-sm backdrop-blur-sm">
-                Status: {ride.status}
-              </div>
-              <div className="px-4 py-1.5 bg-white/20 rounded-full text-sm backdrop-blur-sm">
-                Fare: ₹{ride.estimatedFare}
-              </div>
-            </div>
-          </div>
+    <PageContainer>
+      <TripCard>
+        <TripHeader>
+          <h1>Trip Details</h1>
+          <div className="status-badge">{trip.status}</div>
+        </TripHeader>
 
-          {/* Main Content */}
-          <div className="p-8">
-            {/* OTP Section */}
-            <div className="mb-8">
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-xl border border-green-100">
-                <h3 className="text-xl font-semibold mb-4 text-green-800">Your OTP</h3>
-                <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold tracking-wider text-green-700 bg-white px-6 py-3 rounded-lg shadow-sm">
-                    {ride.otp}
-                  </div>
-                  <div className="text-sm text-green-700">
-                    Share this OTP with your driver to start the trip
-                  </div>
-                </div>
+        <Section>
+          <h2>Driver Information</h2>
+          <DriverInfo>
+            <div className="avatar">
+              {trip.driverPhoto ? (
+                <Image
+                  src={trip.driverPhoto}
+                  alt="Driver"
+                  width={64}
+                  height={64}
+                  className="rounded-full"
+                />
+              ) : (
+                <FaUser size={24} />
+              )}
+            </div>
+            <div className="details">
+              <h3>{trip.driverDetails.name}</h3>
+              <p><FaCar /> {trip.driverDetails.vehicleNumber}</p>
+              <p><FaPhone /> {trip.driverDetails.contactNumber}</p>
+              <p>⭐ {trip.driverDetails.rating || '4.5'} Rating</p>
+            </div>
+          </DriverInfo>
+        </Section>
+
+        <Section>
+          <h2>Trip Information</h2>
+          <LocationInfo>
+            <div className="location-item">
+              <FaMapMarkerAlt className="icon" size={20} />
+              <div className="text">
+                <h4>Pickup Location</h4>
+                <p>{trip.pickupLocation.address}</p>
               </div>
             </div>
-
-            {/* Driver Details */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-semibold mb-4 text-purple-900">Driver Details</h2>
-              <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="font-medium text-purple-900 mb-1">Name</p>
-                    <p className="text-gray-700">{ride.driverDetails?.name}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-purple-900 mb-1">Phone</p>
-                    <p className="text-gray-700">{ride.driverDetails?.phone}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-purple-900 mb-1">Vehicle</p>
-                    <p className="text-gray-700">{ride.driverDetails?.vehicleModel} ({ride.driverDetails?.vehicleNumber})</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-purple-900 mb-1">Rating</p>
-                    <p className="text-gray-700">⭐ {ride.driverDetails?.rating.toFixed(1)} ({ride.driverDetails?.totalRides} rides)</p>
-                  </div>
-                </div>
+            <div className="location-item">
+              <FaMapMarkerAlt className="icon" size={20} />
+              <div className="text">
+                <h4>Drop Location</h4>
+                <p>{trip.dropLocation.address}</p>
               </div>
             </div>
+          </LocationInfo>
+        </Section>
 
-            {/* Trip Details */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-semibold mb-4 text-purple-900">Trip Details</h2>
-              <div className="space-y-6">
-                <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
-                  <div className="mb-6">
-                    <p className="font-medium text-purple-900 mb-2">Pickup Location</p>
-                    <p className="text-gray-700">{ride.pickupLocation?.address}</p>
-                  </div>
-                  <div>
-                    <p className="font-medium text-purple-900 mb-2">Drop-off Location</p>
-                    <p className="text-gray-700">{ride.dropLocation?.address}</p>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-purple-100">
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <p className="font-medium text-purple-900 mb-1">Distance</p>
-                        <p className="text-gray-700">{ride.distance} km</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-purple-900 mb-1">Duration</p>
-                        <p className="text-gray-700">{ride.duration}</p>
-                      </div>
-                      <div>
-                        <p className="font-medium text-purple-900 mb-1">Fare</p>
-                        <p className="text-gray-700">₹{ride.estimatedFare}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+        <Section>
+          <h2>Trip Stats</h2>
+          <TripStats>
+            <div className="stat-item">
+              <h4>Distance</h4>
+              <p>{trip.distance} km</p>
             </div>
-
-            {/* Timestamps */}
-            <div className="text-sm text-gray-500 space-y-1">
-              <p>Started: {new Date(ride.startTime).toLocaleString()}</p>
-              <p>Created: {new Date(ride.createdAt).toLocaleString()}</p>
+            <div className="stat-item">
+              <h4>Duration</h4>
+              <p>{trip.duration}</p>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            <div className="stat-item">
+              <h4>Fare</h4>
+              <p>₹{trip.estimatedFare}</p>
+            </div>
+          </TripStats>
+        </Section>
+      </TripCard>
+    </PageContainer>
   );
-};
-
-export default TripDetails; 
+} 

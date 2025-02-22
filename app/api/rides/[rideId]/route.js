@@ -1,62 +1,70 @@
 import { NextResponse } from 'next/server';
-import mongoose from 'mongoose';
-import { getServerSession } from 'next-auth';
+import { connectDB } from '../../../lib/mongodb';
 import Ride from '../../../models/Ride';
 import Driver from '../../../models/Driver';
 
-// Connect to MongoDB
-let isConnected = false;
-const connectDB = async () => {
-  if (isConnected) return;
-
-  try {
-    await mongoose.connect(process.env.MONGODB_URI);
-    isConnected = true;
-    console.log('MongoDB connected');
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-  }
-};
-
-export async function GET(req, { params }) {
+export async function GET(request, { params }) {
   try {
     await connectDB();
-
     const { rideId } = params;
+
+    // Fetch ride with driver details
+    const ride = await Ride.findById(rideId).lean();
     
-    // Get the ride details
-    const ride = await Ride.findOne({ rideId });
     if (!ride) {
-      return NextResponse.json({ error: 'Ride not found' }, { status: 404 });
+      return NextResponse.json(
+        { message: 'Ride not found' },
+        { status: 404 }
+      );
     }
 
-    // Get driver details
-    const driver = await Driver.findById(ride.driverId);
-    if (!driver) {
-      return NextResponse.json({ error: 'Driver not found' }, { status: 404 });
-    }
-
-    // Combine the data
-    const rideData = {
-      ...ride.toObject(),
-      driverDetails: {
-        name: driver.fullName,
-        phone: driver.phone,
-        vehicleNumber: driver.vehicleNumber,
-        vehicleModel: driver.vehicleModel,
-        rating: driver.rating || 0,
-        totalRides: driver.totalRides || 0
+    // Fetch driver details if available
+    let driverDetails = null;
+    if (ride.driverId) {
+      const driver = await Driver.findById(ride.driverId).lean();
+      if (driver) {
+        driverDetails = {
+          name: driver.name,
+          contactNumber: driver.contactNumber,
+          vehicleNumber: driver.vehicleNumber,
+          vehicleModel: driver.vehicleModel,
+          rating: driver.rating || 4.5,
+          totalRides: driver.totalRides || 0,
+          photo: driver.photo
+        };
       }
+    }
+
+    // Format the response
+    const tripDetails = {
+      ...ride,
+      driverDetails,
+      pickupLocation: {
+        address: ride.pickupLocation?.address || 'Unknown pickup location',
+        coordinates: ride.pickupLocation?.coordinates
+      },
+      dropLocation: {
+        address: ride.dropLocation?.address || 'Unknown destination',
+        coordinates: ride.dropLocation?.coordinates
+      },
+      distance: ride.distance || '0',
+      duration: ride.duration || '0 mins',
+      estimatedFare: ride.estimatedFare || 0,
+      status: ride.status || 'pending',
+      createdAt: ride.createdAt,
+      startTime: ride.startTime
     };
 
-    return NextResponse.json({ 
-      success: true, 
-      data: rideData 
+    return NextResponse.json({
+      success: true,
+      data: tripDetails
     });
+
   } catch (error) {
     console.error('Error fetching ride details:', error);
-    return NextResponse.json({ 
-      error: error.message || 'Failed to fetch ride details' 
-    }, { status: 500 });
+    return NextResponse.json(
+      { message: 'Failed to fetch ride details' },
+      { status: 500 }
+    );
   }
 } 
