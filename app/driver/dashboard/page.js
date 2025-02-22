@@ -495,6 +495,18 @@ export default function DriverDashboard() {
     newSocket.on('connect', () => {
       console.log('Connected to socket server');
       toast.success('Connected to dispatch system');
+
+      // Send initial driver info when connected
+      if (driverProfile && driverId) {
+        newSocket.emit('updateDriverInfo', {
+          driverId: driverId,
+          name: session?.user?.name,
+          contactNumber: driverProfile.phone,
+          location: currentLocation,
+          vehicleNumber: driverProfile.vehicleNumber,
+          status: isActive ? 'online' : 'offline'
+        });
+      }
     });
 
     newSocket.on('disconnect', () => {
@@ -504,7 +516,10 @@ export default function DriverDashboard() {
 
     newSocket.on('driversListUpdated', (drivers) => {
       console.log('Drivers list updated:', drivers);
-      // Handle updated drivers list if needed
+    });
+
+    newSocket.on('nearbyDriversUpdated', (drivers) => {
+      console.log('Nearby drivers updated:', drivers);
     });
 
     // Cleanup on unmount
@@ -513,7 +528,104 @@ export default function DriverDashboard() {
         newSocket.disconnect();
       }
     };
-  }, []);
+  }, [driverProfile, driverId, session]);
+
+  // Update driver status with all required information
+  useEffect(() => {
+    if (socket && session?.user && driverProfile && driverId) {
+      const driverInfo = {
+        driverId: driverId,
+        name: session.user.name,
+        contactNumber: driverProfile.phone,
+        location: currentLocation,
+        address: currentAddress?.full,
+        vehicleNumber: driverProfile.vehicleNumber,
+        status: isActive ? 'online' : 'offline'
+      };
+
+      socket.emit('updateDriverInfo', driverInfo);
+    }
+  }, [isActive, currentLocation, currentAddress, session, socket, driverProfile, driverId]);
+
+  // Handle status toggle with MongoDB update
+  const handleStatusToggle = async () => {
+    if (!socket) {
+      toast.error('Not connected to dispatch system');
+      return;
+    }
+
+    if (!driverProfile?.phone) {
+      toast.error('Please complete your profile with contact number');
+      router.push('/driver/profile');
+      return;
+    }
+
+    if (!isActive) {
+      try {
+        console.log('Requesting location permission...');
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 0
+          });
+        });
+        
+        console.log('Initial location received:', position.coords);
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setCurrentLocation(location);
+        
+        // Get initial address using OpenStreetMap
+        await getAddressFromCoordinates(location.lat, location.lng);
+        
+        // Generate new driver ID when going online
+        const newDriverId = generateDriverId();
+        setDriverId(newDriverId);
+        
+        // Update status in MongoDB with new driver ID
+        await updateDriverStatusInDB(true);
+
+        // Update socket with new driver ID and status
+        socket.emit('updateDriverStatus', 'online');
+        socket.emit('updateDriverInfo', {
+          driverId: newDriverId,
+          name: session.user.name,
+          contactNumber: driverProfile.phone,
+          location: location,
+          vehicleNumber: driverProfile.vehicleNumber,
+          status: 'online'
+        });
+      } catch (error) {
+        console.error('Initial location error:', error);
+        let errorMessage = 'Location access is required to go online';
+        if (error.code === 1) {
+          errorMessage = 'Please enable location access in your browser settings';
+        }
+        toast.error(errorMessage);
+        return;
+      }
+    } else {
+      // Update status in MongoDB when going offline
+      await updateDriverStatusInDB(false);
+      
+      // Update socket status
+      socket.emit('updateDriverStatus', 'offline');
+      socket.emit('updateDriverInfo', {
+        driverId: driverId,
+        name: session.user.name,
+        contactNumber: driverProfile.phone,
+        location: currentLocation,
+        vehicleNumber: driverProfile.vehicleNumber,
+        status: 'offline'
+      });
+    }
+
+    setIsActive(!isActive);
+    toast.success(!isActive ? 'You are now online' : 'You are now offline');
+  };
 
   // Get and update location
   useEffect(() => {
@@ -565,100 +677,6 @@ export default function DriverDashboard() {
       }
     };
   }, [isActive, socket]);
-
-  // Update driver status with all required information
-  useEffect(() => {
-    if (socket && session?.user && driverProfile) {
-      const driverInfo = {
-        driverId: driverId,
-        name: session.user.name,
-        contactNumber: driverProfile.phone,
-        location: currentLocation,
-        address: currentAddress?.full,
-        vehicleNumber: driverProfile.vehicleNumber,
-        status: isActive ? 'active' : 'inactive'
-      };
-
-      socket.emit('updateDriverInfo', driverInfo);
-    }
-  }, [isActive, currentLocation, currentAddress, session, socket, driverProfile, driverId]);
-
-  // Handle status toggle with MongoDB update
-  const handleStatusToggle = async () => {
-    if (!socket) {
-      toast.error('Not connected to dispatch system');
-      return;
-    }
-
-    if (!driverProfile?.phone) {
-      toast.error('Please complete your profile with contact number');
-      router.push('/driver/profile');
-      return;
-    }
-
-    if (!isActive) {
-      try {
-        console.log('Requesting location permission...');
-        const position = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 20000,
-            maximumAge: 0
-          });
-        });
-        
-        console.log('Initial location received:', position.coords);
-        const location = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        setCurrentLocation(location);
-        
-        // Get initial address using OpenStreetMap
-        await getAddressFromCoordinates(location.lat, location.lng);
-        
-        // Generate new driver ID when going online
-        const newDriverId = generateDriverId();
-        setDriverId(newDriverId);
-        
-        // Update status in MongoDB with new driver ID
-        await updateDriverStatusInDB(true);
-
-        // Update socket with new driver ID
-        if (socket && session?.user && driverProfile) {
-          const driverInfo = {
-            driverId: newDriverId,
-            name: session.user.name,
-            contactNumber: driverProfile.phone,
-            location: location,
-            address: currentAddress?.full,
-            vehicleNumber: driverProfile.vehicleNumber,
-            status: 'active'
-          };
-          socket.emit('updateDriverInfo', driverInfo);
-        }
-      } catch (error) {
-        console.error('Initial location error:', error);
-        let errorMessage = 'Location access is required to go online';
-        if (error.code === 1) {
-          errorMessage = 'Please enable location access in your browser settings';
-        }
-        toast.error(errorMessage);
-        return;
-      }
-    } else {
-      // Update status in MongoDB when going offline
-      await updateDriverStatusInDB(false);
-    }
-
-    const newStatus = !isActive;
-    setIsActive(newStatus);
-    
-    // Update status on socket server
-    socket.emit('updateDriverStatus', newStatus ? 'active' : 'inactive');
-    
-    toast.success(newStatus ? 'You are now online' : 'You are now offline');
-  };
 
   useEffect(() => {
     if (status === 'unauthenticated') {

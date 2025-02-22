@@ -2,6 +2,11 @@ import { getServerSession } from 'next-auth';
 import { NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import Driver from '@/app/models/Driver';
+import NextAuth from 'next-auth';
+import GoogleProvider from 'next-auth/providers/google';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import bcrypt from 'bcryptjs';
+import User from '@/models/User';
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -25,8 +30,7 @@ const userSchema = new mongoose.Schema({
   },
   gender: {
     type: String,
-    required: [true, 'Gender is required'],
-    enum: ['male', 'female', 'other', 'prefer_not_to_say']
+    enum: ['male', 'female', 'other', 'prefer_not_to_say'],
   },
   address: {
     type: String,
@@ -143,6 +147,10 @@ const userSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  profileCompleted: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -152,7 +160,7 @@ userSchema.pre('save', function(next) {
   next();
 });
 
-const User = mongoose.models.User || mongoose.model('User', userSchema);
+const UserModel = mongoose.models.User || mongoose.model('User', userSchema);
 
 // Connect to MongoDB
 let isConnected = false;
@@ -168,6 +176,124 @@ const connectDB = async () => {
   }
 };
 
+const authOptions = {
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
+    CredentialsProvider({
+      name: 'Credentials',
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
+      async authorize(credentials) {
+        try {
+          if (mongoose.connection.readyState !== 1) {
+            await mongoose.connect(process.env.MONGODB_URI);
+          }
+
+          const user = await UserModel.findOne({ email: credentials.email });
+          if (!user) {
+            throw new Error('No user found with this email');
+          }
+
+          const isValid = await bcrypt.compare(credentials.password, user.password);
+          if (!isValid) {
+            throw new Error('Invalid password');
+          }
+
+          return {
+            id: user._id.toString(),
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            profileCompleted: user.profileCompleted
+          };
+        } catch (error) {
+          throw new Error(error.message);
+        }
+      }
+    })
+  ],
+  callbacks: {
+    async signIn({ user, account }) {
+      if (account.provider === 'google') {
+        try {
+          if (mongoose.connection.readyState !== 1) {
+            await mongoose.connect(process.env.MONGODB_URI);
+          }
+
+          // Check if user exists
+          let dbUser = await UserModel.findOne({ email: user.email });
+          
+          if (!dbUser) {
+            // Create new user with minimal required fields
+            dbUser = await UserModel.create({
+              name: user.name,
+              email: user.email,
+              role: 'user',
+              profileCompleted: false
+            });
+          }
+
+          // Add profileCompleted status to the user object
+          user.profileCompleted = dbUser.profileCompleted;
+          user.role = dbUser.role;
+          
+          return true;
+        } catch (error) {
+          console.error('Database Error:', error);
+          return false;
+        }
+      }
+      return true;
+    },
+
+    async session({ session, token }) {
+      // Add additional user info to session
+      if (session?.user) {
+        session.user.role = token.role;
+        session.user.profileCompleted = token.profileCompleted;
+      }
+      return session;
+    },
+
+    async jwt({ token, user, account }) {
+      // Add additional info to token
+      if (user) {
+        token.role = user.role;
+        token.profileCompleted = user.profileCompleted;
+      }
+      return token;
+    },
+
+    async redirect({ url, baseUrl }) {
+      // Customize redirect based on whether profile is completed
+      if (url.startsWith(baseUrl)) {
+        const session = await getServerSession();
+        if (session?.user && !session.user.profileCompleted) {
+          return `${baseUrl}/user-details`;
+        }
+        return url;
+      }
+      return baseUrl;
+    }
+  },
+  pages: {
+    signIn: '/login',
+    signUp: '/signup',
+    error: '/auth/error',
+  },
+  session: {
+    strategy: 'jwt'
+  }
+};
+
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
+
 export async function POST(req) {
   try {
     const session = await getServerSession();
@@ -179,7 +305,7 @@ export async function POST(req) {
     const data = await req.json();
 
     // Update or create user details
-    const user = await User.findOneAndUpdate(
+    const user = await UserModel.findOneAndUpdate(
       { email: session.user.email },
       {
         ...data,

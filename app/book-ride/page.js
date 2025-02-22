@@ -570,6 +570,122 @@ const suggestions = [
   },
 ];
 
+const ConfirmButton = styled(SubmitButton)`
+  margin-top: 1rem;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);
+  }
+`;
+
+const BottomDrawer = styled.div`
+  position: fixed;
+  bottom: ${props => props.show ? '0' : '-100%'};
+  left: 0;
+  right: 0;
+  background: white;
+  padding: 2rem;
+  border-top-left-radius: 2rem;
+  border-top-right-radius: 2rem;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  transition: bottom 0.3s ease-in-out;
+  z-index: 1000;
+  
+  @keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+`;
+
+const ConnectingAnimation = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  margin: 2rem 0;
+
+  .ripple {
+    position: relative;
+    width: 80px;
+    height: 80px;
+  }
+
+  .ripple div {
+    position: absolute;
+    border: 4px solid #059669;
+    border-radius: 50%;
+    animation: ripple 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+    opacity: 1;
+  }
+
+  .ripple div:nth-child(2) {
+    animation-delay: -0.5s;
+  }
+
+  @keyframes ripple {
+    0% {
+      top: 36px;
+      left: 36px;
+      width: 0;
+      height: 0;
+      opacity: 1;
+    }
+    100% {
+      top: 0px;
+      left: 0px;
+      width: 72px;
+      height: 72px;
+      opacity: 0;
+    }
+  }
+
+  .car-icon {
+    animation: bounce 1s ease infinite;
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+`;
+
+const CancelButton = styled.button`
+  background: #EF4444;
+  color: white;
+  padding: 1rem;
+  border-radius: 1rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  max-width: 200px;
+  margin: 0 auto;
+  display: block;
+
+  &:hover {
+    background: #DC2626;
+    transform: translateY(-2px);
+  }
+`;
+
+const ConnectingText = styled.div`
+  text-align: center;
+  color: #059669;
+  font-weight: 600;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+
+  p {
+    color: #6B7280;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+  }
+`;
+
 export default function BookRide() {
   const searchParams = useSearchParams();
   const vehicleType = parseInt(searchParams.get('type') || '1', 10);
@@ -587,6 +703,8 @@ export default function BookRide() {
   const [toCoords, setToCoords] = useState(null);
   const [routeDetails, setRouteDetails] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(vehicleType); // Initialize with URL param
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   
   const fromInputRef = useRef(null);
   const toInputRef = useRef(null);
@@ -823,6 +941,19 @@ export default function BookRide() {
     });
   };
 
+  const handleConfirmTrip = () => {
+    setIsConfirming(true);
+    setIsConnecting(true);
+    // Here you would typically make an API call to your backend/socket server
+    // to find and connect with a driver
+  };
+
+  const handleCancelTrip = () => {
+    setIsConfirming(false);
+    setIsConnecting(false);
+    // Here you would typically cancel the driver search
+  };
+
   return (
     <BookingContainer>
       <BookingCard>
@@ -990,13 +1121,22 @@ export default function BookRide() {
                 </VehicleOptions>
 
                 {selectedVehicle && routeDetails.fares && (
-                  <PriceBreakdown>
-                    <div>Base Fare: ₹{routeDetails.fares.find(v => v.id === selectedVehicle)?.fare.baseFare}</div>
-                    <div>Distance Charge: ₹{routeDetails.fares.find(v => v.id === selectedVehicle)?.fare.perKmCharge}</div>
-                    <div style={{ fontWeight: 600, color: '#4C1D95', borderTop: '1px solid rgba(109, 40, 217, 0.2)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                      Total Fare: ₹{routeDetails.fares.find(v => v.id === selectedVehicle)?.fare.total}
-                    </div>
-                  </PriceBreakdown>
+                  <>
+                    <PriceBreakdown>
+                      <div>Base Fare: ₹{routeDetails.fares.find(v => v.id === selectedVehicle)?.fare.baseFare}</div>
+                      <div>Distance Charge: ₹{routeDetails.fares.find(v => v.id === selectedVehicle)?.fare.perKmCharge}</div>
+                      <div style={{ fontWeight: 600, color: '#4C1D95', borderTop: '1px solid rgba(109, 40, 217, 0.2)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                        Total Fare: ₹{routeDetails.fares.find(v => v.id === selectedVehicle)?.fare.total}
+                      </div>
+                    </PriceBreakdown>
+                    
+                    <ConfirmButton 
+                      onClick={handleConfirmTrip}
+                      disabled={isConfirming}
+                    >
+                      {isConfirming ? 'Confirming...' : 'Confirm Trip'}
+                    </ConfirmButton>
+                  </>
                 )}
               </RideDetails>
             )}
@@ -1025,6 +1165,32 @@ export default function BookRide() {
             </MapWrapper>
           </>
         )}
+
+        <BottomDrawer show={isConfirming}>
+          <ConnectingAnimation>
+            <div className="ripple">
+              <div></div>
+              <div></div>
+            </div>
+            <div className="car-icon">
+              <Image
+                src={suggestions.find(v => v.id === selectedVehicle)?.icon || '/taxi.png'}
+                alt="Vehicle"
+                width={48}
+                height={48}
+              />
+            </div>
+          </ConnectingAnimation>
+          
+          <ConnectingText>
+            Connecting you with nearby drivers
+            <p>This usually takes 30-60 seconds</p>
+          </ConnectingText>
+          
+          <CancelButton onClick={handleCancelTrip}>
+            Cancel
+          </CancelButton>
+        </BottomDrawer>
       </BookingCard>
     </BookingContainer>
   );
