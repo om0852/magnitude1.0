@@ -169,7 +169,11 @@ export default function DriverProfile() {
     city: '',
     state: '',
     pincode: '',
-    emergencyContact: '',
+    emergencyContact: {
+      name: '',
+      phone: '',
+      relationship: ''
+    },
     profileImage: null
   });
 
@@ -207,10 +211,24 @@ export default function DriverProfile() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => {
+      // Handle nested objects (e.g., emergencyContact.name)
+      if (name.includes('.')) {
+        const [parent, child] = name.split('.');
+        return {
+          ...prev,
+          [parent]: {
+            ...prev[parent],
+            [child]: value
+          }
+        };
+      }
+      // Handle regular fields
+      return {
+        ...prev,
+        [name]: value
+      };
+    });
     // Clear any previous errors when user starts typing
     setError('');
   };
@@ -435,15 +453,90 @@ export default function DriverProfile() {
             </FormGroup>
 
             <FormGroup>
-              <label>Emergency Contact</label>
+              <label>City</label>
+              <div className="input-container">
+                <FaMapMarkerAlt size={16} />
+                <Input
+                  type="text"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  placeholder="Enter your city"
+                  required
+                />
+              </div>
+            </FormGroup>
+
+            <FormGroup>
+              <label>State</label>
+              <div className="input-container">
+                <FaMapMarkerAlt size={16} />
+                <Input
+                  type="text"
+                  name="state"
+                  value={formData.state}
+                  onChange={handleChange}
+                  placeholder="Enter your state"
+                  required
+                />
+              </div>
+            </FormGroup>
+
+            <FormGroup>
+              <label>Pincode</label>
+              <div className="input-container">
+                <FaMapMarkerAlt size={16} />
+                <Input
+                  type="text"
+                  name="pincode"
+                  value={formData.pincode}
+                  onChange={handleChange}
+                  placeholder="Enter your pincode"
+                  required
+                />
+              </div>
+            </FormGroup>
+
+            <FormGroup>
+              <label>Emergency Contact Name</label>
+              <div className="input-container">
+                <FaUser size={16} />
+                <Input
+                  type="text"
+                  name="emergencyContact.name"
+                  value={formData.emergencyContact.name}
+                  onChange={handleChange}
+                  placeholder="Enter emergency contact name"
+                  required
+                />
+              </div>
+            </FormGroup>
+
+            <FormGroup>
+              <label>Emergency Contact Phone</label>
               <div className="input-container">
                 <FaPhone size={16} />
                 <Input
                   type="tel"
-                  name="emergencyContact"
-                  value={formData.emergencyContact}
+                  name="emergencyContact.phone"
+                  value={formData.emergencyContact.phone}
                   onChange={handleChange}
                   placeholder="Enter emergency contact number"
+                  required
+                />
+              </div>
+            </FormGroup>
+
+            <FormGroup>
+              <label>Emergency Contact Relationship</label>
+              <div className="input-container">
+                <FaUser size={16} />
+                <Input
+                  type="text"
+                  name="emergencyContact.relationship"
+                  value={formData.emergencyContact.relationship}
+                  onChange={handleChange}
+                  placeholder="Enter relationship with emergency contact"
                   required
                 />
               </div>

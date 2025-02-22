@@ -200,7 +200,6 @@ const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
-<<<<<<< HEAD
     const { data: session, status } = useSession();
 
     const handleLogin = () => {
@@ -211,12 +210,6 @@ const Navbar = () => {
         await signOut({ redirect: false });
         router.push('/');
     };
-=======
-
-    const handleLoginClick = () => {
-        router.push('/login');
-    };
->>>>>>> 962a2a7d5cfdd9a5ea829a236a2d5242c69c77ec
 
     return (
         <NavContainer>
@@ -240,7 +233,6 @@ const Navbar = () => {
                     </LogoContainer>
 
                     <LoginButtonContainer>
-<<<<<<< HEAD
                         {status === 'authenticated' ? (
                             <>
                                 <UserInfo>{session.user.name}</UserInfo>
@@ -253,9 +245,6 @@ const Navbar = () => {
                                 Login
                             </LoginButton>
                         )}
-=======
-                        <LoginButton onClick={handleLoginClick}>Login</LoginButton>
->>>>>>> 962a2a7d5cfdd9a5ea829a236a2d5242c69c77ec
                     </LoginButtonContainer>
 
                     <MobileMenuButton onClick={() => setIsMenuOpen(!isMenuOpen)}>
@@ -282,7 +271,6 @@ const Navbar = () => {
                     <MobileLink href="/settings">Settings</MobileLink>
                     <MobileLink href="/contact">Contact</MobileLink>
                     <MobileLink href="/about">About Us</MobileLink>
-<<<<<<< HEAD
                     {status === 'authenticated' ? (
                         <>
                             <div style={{ color: 'white', padding: '0.5rem 0.75rem' }}>
@@ -297,9 +285,6 @@ const Navbar = () => {
                             Login
                         </MobileLoginButton>
                     )}
-=======
-                    <MobileLoginButton onClick={handleLoginClick}>Login</MobileLoginButton>
->>>>>>> 962a2a7d5cfdd9a5ea829a236a2d5242c69c77ec
                 </MobileMenuContent>
             </MobileMenu>
         </NavContainer>

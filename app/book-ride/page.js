@@ -6,7 +6,9 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import io from 'socket.io-client';
+import { toast } from 'react-hot-toast';
 
 // Fix for default marker icons in Leaflet
 const sourceIcon = L.icon({
@@ -689,6 +691,7 @@ const ConnectingText = styled.div`
 export default function BookRide() {
   const searchParams = useSearchParams();
   const vehicleType = parseInt(searchParams.get('type') || '1', 10);
+  const router = useRouter();
   
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
@@ -705,6 +708,10 @@ export default function BookRide() {
   const [selectedVehicle, setSelectedVehicle] = useState(vehicleType); // Initialize with URL param
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const [matchedDriver, setMatchedDriver] = useState(null);
+  const [searchingForDriver, setSearchingForDriver] = useState(false);
+  const [nearbyDrivers, setNearbyDrivers] = useState([]);
   
   const fromInputRef = useRef(null);
   const toInputRef = useRef(null);
@@ -941,17 +948,142 @@ export default function BookRide() {
     });
   };
 
+  // Update the socket connection useEffect
+  useEffect(() => {
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+
+    // Socket event listeners
+    newSocket.on('connect', () => {
+      console.log('Connected to ride booking system');
+    });
+
+    newSocket.on('nearbyDriversUpdated', (drivers) => {
+      console.log('Nearby drivers:', drivers);
+      setNearbyDrivers(drivers);
+    });
+
+    newSocket.on('driverAccepted', (response) => {
+      console.log('Driver accepted response:', response);
+      const { driverName, rideId, message, tripDetails } = response;
+      
+      setMatchedDriver(response);
+      setSearchingForDriver(false);
+      setIsConnecting(false);
+      
+      // Show success toast with driver details
+      toast.success(message || `Driver ${driverName} has been assigned to your trip!`, {
+        duration: 5000,
+        icon: '🚗'
+      });
+      
+      // Play a notification sound
+      try {
+        const audio = new Audio('/notification-sound.mp3');
+        audio.play();
+      } catch (e) {
+        console.log('Audio play failed:', e);
+      }
+      
+      // Navigate to trip details page
+      setTimeout(() => {
+        router.push(`/trip-details/${rideId}`);
+      }, 2000);
+    });
+
+    newSocket.on('tripRejected', (response) => {
+      console.log('Trip rejected:', response);
+      const { message, status } = response;
+      
+      // Show rejection message
+      toast.error(message || 'Driver rejected the trip request', {
+        duration: 4000,
+        icon: '❌'
+      });
+
+      if (status === 'rejected') {
+        // If no other driver is being searched, reset the UI
+        setSearchingForDriver(false);
+        setIsConnecting(false);
+        setMatchedDriver(null);
+      }
+    });
+
+    newSocket.on('noDriversAvailable', () => {
+      setSearchingForDriver(false);
+      setIsConnecting(false);
+      toast.error('No drivers available at the moment. Please try again later.', {
+        duration: 4000,
+        icon: '😕'
+      });
+    });
+
+    newSocket.on('driverLocation', (location) => {
+      if (matchedDriver) {
+        const updatedDriver = { ...matchedDriver, location };
+        setMatchedDriver(updatedDriver);
+      }
+    });
+
+    // Cleanup on unmount
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, [router]);
+
+  // Update handleConfirmTrip function
   const handleConfirmTrip = () => {
+    if (!socket) {
+      toast.error('Unable to connect to booking system');
+      return;
+    }
+
+    if (!fromCoords || !toCoords || !selectedVehicle) {
+      toast.error('Please select pickup, dropoff locations and vehicle type');
+      return;
+    }
+
     setIsConfirming(true);
     setIsConnecting(true);
-    // Here you would typically make an API call to your backend/socket server
-    // to find and connect with a driver
+    setSearchingForDriver(true);
+
+    // First get nearby drivers
+    socket.emit('getNearbyDrivers', {
+      lat: fromCoords[0],
+      lng: fromCoords[1]
+    });
+
+    // Emit trip request to server
+    socket.emit('requestTrip', {
+      pickupLocation: {
+        lat: fromCoords[0],
+        lng: fromCoords[1],
+        address: fromLocation
+      },
+      dropLocation: {
+        lat: toCoords[0],
+        lng: toCoords[1],
+        address: toLocation
+      },
+      vehicleType: selectedVehicle,
+      estimatedFare: routeDetails.fares.find(v => v.id === selectedVehicle)?.fare.total,
+      distance: routeDetails.distance,
+      duration: routeDetails.duration
+    });
+
+    toast.info('Searching for nearby drivers...');
   };
 
   const handleCancelTrip = () => {
+    if (socket && searchingForDriver) {
+      socket.emit('cancelTripRequest');
+    }
     setIsConfirming(false);
     setIsConnecting(false);
-    // Here you would typically cancel the driver search
+    setSearchingForDriver(false);
+    setMatchedDriver(null);
   };
 
   return (
@@ -1172,23 +1304,51 @@ export default function BookRide() {
               <div></div>
               <div></div>
             </div>
-            <div className="car-icon">
-              <Image
-                src={suggestions.find(v => v.id === selectedVehicle)?.icon || '/taxi.png'}
-                alt="Vehicle"
-                width={48}
-                height={48}
-              />
-            </div>
+            {matchedDriver ? (
+              <div className="matched-driver">
+                <Image
+                  src={suggestions.find(v => v.id === selectedVehicle)?.icon || '/taxi.png'}
+                  alt="Vehicle"
+                  width={48}
+                  height={48}
+                />
+                <div className="driver-info">
+                  <h3>{matchedDriver.name}</h3>
+                  <p>{matchedDriver.vehicleNumber}</p>
+                  <p>Distance: {matchedDriver.distance}km away</p>
+                </div>
+              </div>
+            ) : (
+              <div className="car-icon">
+                <Image
+                  src={suggestions.find(v => v.id === selectedVehicle)?.icon || '/taxi.png'}
+                  alt="Vehicle"
+                  width={48}
+                  height={48}
+                />
+              </div>
+            )}
           </ConnectingAnimation>
           
           <ConnectingText>
-            Connecting you with nearby drivers
-            <p>This usually takes 30-60 seconds</p>
+            {matchedDriver ? (
+              <>
+                Driver is on the way!
+                <p>They will arrive in approximately {matchedDriver.distance * 2} minutes</p>
+              </>
+            ) : (
+              <>
+                Connecting you with nearby drivers
+                <p>This usually takes 30-60 seconds</p>
+                {nearbyDrivers.length > 0 && (
+                  <p>{nearbyDrivers.length} drivers found nearby</p>
+                )}
+              </>
+            )}
           </ConnectingText>
           
           <CancelButton onClick={handleCancelTrip}>
-            Cancel
+            {matchedDriver ? 'Cancel Ride' : 'Cancel'}
           </CancelButton>
         </BottomDrawer>
       </BookingCard>

@@ -10,6 +10,7 @@ import { MdLocationOn, MdTimer } from 'react-icons/md';
 import Image from 'next/image';
 import io from 'socket.io-client';
 import toast, { Toaster } from 'react-hot-toast';
+import RideRequestNotification from '../../components/RideRequestNotification';
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -79,24 +80,27 @@ const StatusCard = styled(Card)`
 `;
 
 const StatusToggle = styled.button`
-  background: ${props => props.isActive ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.2)'};
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 0.5rem 1rem;
-  border-radius: 2rem;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
   cursor: pointer;
-  font-weight: 500;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(5px);
+  font-weight: 600;
+  transition: all 0.3s ease;
 
-  &:hover {
-    transform: translateY(-2px);
-    background: rgba(255, 255, 255, 0.25);
+  &.online {
+    background: #10B981;
+    color: white;
+    &:hover {
+      background: #059669;
+    }
   }
 
-  &:active {
-    transform: translateY(0);
+  &.offline {
+    background: #EF4444;
+    color: white;
+    &:hover {
+      background: #DC2626;
+    }
   }
 `;
 
@@ -363,12 +367,18 @@ const LocationCard = styled.div`
   }
 `;
 
+const DashboardContainer = styled.div`
+  padding: 2rem;
+`;
+
 export default function DriverDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [isActive, setIsActive] = useState(false);
-  const [selectedTab, setSelectedTab] = useState('today');
+  const [isOnline, setIsOnline] = useState(false);
   const [socket, setSocket] = useState(null);
+  const [currentRequest, setCurrentRequest] = useState(null);
+  const [driverInfo, setDriverInfo] = useState(null);
+  const [selectedTab, setSelectedTab] = useState('today');
   const [currentLocation, setCurrentLocation] = useState(null);
   const [currentAddress, setCurrentAddress] = useState(null);
   const [driverProfile, setDriverProfile] = useState(null);
@@ -385,6 +395,198 @@ export default function DriverDashboard() {
     todayCompleted: 8,
     rating: 4.8
   });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+
+    // Fetch driver info
+    const fetchDriverInfo = async () => {
+      try {
+        const response = await fetch('/api/driver/profile');
+        const data = await response.json();
+        if (data.success) {
+          setDriverInfo(data.data);
+          // Generate driver ID if not exists and update it in the database
+          const newDriverId = data.data.driverId || generateDriverId();
+          setDriverId(newDriverId);
+          
+          // If there was no driver ID, update it in the database
+          if (!data.data.driverId) {
+            await updateDriverStatusInDB(false); // This will save the new driver ID
+          }
+        } else {
+          console.error('Failed to fetch driver profile:', data.error);
+          toast.error('Failed to load driver profile');
+        }
+      } catch (error) {
+        console.error('Error fetching driver profile:', error);
+        toast.error('Error loading driver profile');
+      }
+    };
+
+    fetchDriverInfo();
+  }, [status, router]);
+
+  useEffect(() => {
+    if (!driverInfo) return;
+
+    // Initialize socket connection
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+
+    // Listen for new trip requests
+    newSocket.on('newTripRequest', (request) => {
+      setCurrentRequest(request);
+      // You can also add sound notification here
+      new Audio('/notification-sound.mp3').play().catch(e => console.log(e));
+    });
+
+    // Clean up on unmount
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, [driverInfo]);
+
+  useEffect(() => {
+    if (!socket || !driverInfo) return;
+
+    // Update driver info when status changes
+    socket.emit('updateDriverInfo', {
+      driverId: driverInfo._id,
+      name: driverInfo.fullName,
+      location: driverInfo.location || { lat: 0, lng: 0 },
+      vehicleNumber: driverInfo.vehicleNumber,
+      status: isOnline ? 'online' : 'offline',
+      contactNumber: driverInfo.phone
+    });
+
+    // Listen for ride status updates
+    socket.on('rideStatusUpdate', (data) => {
+      if (data.status === 'in_progress') {
+        // Handle ride in progress
+        toast.success('Ride started!');
+      } else if (data.status === 'completed') {
+        // Handle ride completion
+        toast.success('Ride completed!');
+      }
+    });
+
+    return () => {
+      socket.off('rideStatusUpdate');
+    };
+  }, [isOnline, socket, driverInfo]);
+
+  const handleStatusToggle = () => {
+    setIsOnline(!isOnline);
+    if (socket) {
+      socket.emit('updateDriverStatus', !isOnline ? 'online' : 'offline');
+    }
+  };
+
+  const handleAcceptRide = async (rideId) => {
+    if (!socket) {
+      toast.error('Not connected to server');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const loadingToast = toast.loading('Accepting ride request...');
+      console.log("Current Request:", currentRequest);
+
+      // Prepare trip request data with all required fields
+      const tripRequestData = {
+        requestId: currentRequest.requestId || `REQ${Date.now()}`,
+        userId: currentRequest.userId,
+        socketId: currentRequest.socketId,
+        pickupLocation: {
+          lat: parseFloat(currentRequest.pickupLocation.lat),
+          lng: parseFloat(currentRequest.pickupLocation.lng),
+          address: currentRequest.pickupLocation.address
+        },
+        dropLocation: {
+          lat: parseFloat(currentRequest.dropLocation.lat),
+          lng: parseFloat(currentRequest.dropLocation.lng),
+          address: currentRequest.dropLocation.address
+        },
+        distance: currentRequest.distance || '0',
+        duration: currentRequest.duration || '0m',
+        vehicleType: parseInt(currentRequest.vehicleType) || 1,
+        estimatedFare: parseFloat(currentRequest.estimatedFare) || 0,
+        userDetails: {
+          name: currentRequest.name || 'Anonymous',
+          phoneNumber: currentRequest.phoneNumber || 'Not provided',
+          email: currentRequest.email || 'Not provided',
+          gender: currentRequest.gender || 'Not specified'
+        }
+      };
+
+      console.log("Sending trip request data:", tripRequestData);
+
+      // Update ride status in your database
+      const response = await fetch('/api/rides/accept', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          rideId,
+          tripRequest: tripRequestData
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to accept ride');
+      }
+
+      // Emit socket event for ride acceptance
+      socket.emit('rideAccepted', {
+        rideId,
+        driverId: driverInfo._id,
+        driverName: driverInfo.fullName,
+        vehicleNumber: driverInfo.vehicleNumber,
+        contactNumber: driverInfo.phone,
+        status: 'in_progress'
+      });
+
+      // Clear the current request
+      setCurrentRequest(null);
+
+      // Show success message
+      toast.success('Ride accepted successfully!', {
+        id: loadingToast
+      });
+
+      // Navigate to the ride details page
+      router.push(`/driver/rides/${rideId}`);
+    } catch (error) {
+      console.error('Error accepting ride:', error);
+      toast.error(error.message || 'Failed to accept ride. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRejectRide = (rideId) => {
+    if (!socket) return;
+
+    // Emit socket event for ride rejection
+    socket.emit('rideRejected', {
+      rideId,
+      driverId: driverInfo._id
+    });
+
+    // Clear the current request
+    setCurrentRequest(null);
+  };
 
   // Generate or get driver ID
   const generateDriverId = () => {
@@ -422,38 +624,6 @@ export default function DriverDashboard() {
     }
   };
 
-  // Fetch driver profile
-  useEffect(() => {
-    const fetchDriverProfile = async () => {
-      try {
-        const response = await fetch('/api/driver/profile');
-        const data = await response.json();
-        
-        if (data.success && data.data) {
-          setDriverProfile(data.data);
-          // Generate driver ID if not exists and update it in the database
-          const newDriverId = data.data.driverId || generateDriverId();
-          setDriverId(newDriverId);
-          
-          // If there was no driver ID, update it in the database
-          if (!data.data.driverId) {
-            await updateDriverStatusInDB(false); // This will save the new driver ID
-          }
-        } else {
-          console.error('Failed to fetch driver profile:', data.error);
-          toast.error('Failed to load driver profile');
-        }
-      } catch (error) {
-        console.error('Error fetching driver profile:', error);
-        toast.error('Error loading driver profile');
-      }
-    };
-
-    if (session?.user) {
-      fetchDriverProfile();
-    }
-  }, [session]);
-
   // Function to get address from coordinates using OpenStreetMap
   const getAddressFromCoordinates = async (lat, lng) => {
     try {
@@ -486,152 +656,11 @@ export default function DriverDashboard() {
     }
   };
 
-  // Initialize socket connection
-  useEffect(() => {
-    const newSocket = io('http://localhost:5000');
-    setSocket(newSocket);
-
-    // Socket event listeners
-    newSocket.on('connect', () => {
-      console.log('Connected to socket server');
-      toast.success('Connected to dispatch system');
-
-      // Send initial driver info when connected
-      if (driverProfile && driverId) {
-        newSocket.emit('updateDriverInfo', {
-          driverId: driverId,
-          name: session?.user?.name,
-          contactNumber: driverProfile.phone,
-          location: currentLocation,
-          vehicleNumber: driverProfile.vehicleNumber,
-          status: isActive ? 'online' : 'offline'
-        });
-      }
-    });
-
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from socket server');
-      toast.error('Disconnected from dispatch system');
-    });
-
-    newSocket.on('driversListUpdated', (drivers) => {
-      console.log('Drivers list updated:', drivers);
-    });
-
-    newSocket.on('nearbyDriversUpdated', (drivers) => {
-      console.log('Nearby drivers updated:', drivers);
-    });
-
-    // Cleanup on unmount
-    return () => {
-      if (newSocket) {
-        newSocket.disconnect();
-      }
-    };
-  }, [driverProfile, driverId, session]);
-
-  // Update driver status with all required information
-  useEffect(() => {
-    if (socket && session?.user && driverProfile && driverId) {
-      const driverInfo = {
-        driverId: driverId,
-        name: session.user.name,
-        contactNumber: driverProfile.phone,
-        location: currentLocation,
-        address: currentAddress?.full,
-        vehicleNumber: driverProfile.vehicleNumber,
-        status: isActive ? 'online' : 'offline'
-      };
-
-      socket.emit('updateDriverInfo', driverInfo);
-    }
-  }, [isActive, currentLocation, currentAddress, session, socket, driverProfile, driverId]);
-
-  // Handle status toggle with MongoDB update
-  const handleStatusToggle = async () => {
-    if (!socket) {
-      toast.error('Not connected to dispatch system');
-      return;
-    }
-
-    if (!driverProfile?.phone) {
-      toast.error('Please complete your profile with contact number');
-      router.push('/driver/profile');
-      return;
-    }
-
-    if (!isActive) {
-      try {
-        console.log('Requesting location permission...');
-        const position = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 20000,
-            maximumAge: 0
-          });
-        });
-        
-        console.log('Initial location received:', position.coords);
-        const location = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        setCurrentLocation(location);
-        
-        // Get initial address using OpenStreetMap
-        await getAddressFromCoordinates(location.lat, location.lng);
-        
-        // Generate new driver ID when going online
-        const newDriverId = generateDriverId();
-        setDriverId(newDriverId);
-        
-        // Update status in MongoDB with new driver ID
-        await updateDriverStatusInDB(true);
-
-        // Update socket with new driver ID and status
-        socket.emit('updateDriverStatus', 'online');
-        socket.emit('updateDriverInfo', {
-          driverId: newDriverId,
-          name: session.user.name,
-          contactNumber: driverProfile.phone,
-          location: location,
-          vehicleNumber: driverProfile.vehicleNumber,
-          status: 'online'
-        });
-      } catch (error) {
-        console.error('Initial location error:', error);
-        let errorMessage = 'Location access is required to go online';
-        if (error.code === 1) {
-          errorMessage = 'Please enable location access in your browser settings';
-        }
-        toast.error(errorMessage);
-        return;
-      }
-    } else {
-      // Update status in MongoDB when going offline
-      await updateDriverStatusInDB(false);
-      
-      // Update socket status
-      socket.emit('updateDriverStatus', 'offline');
-      socket.emit('updateDriverInfo', {
-        driverId: driverId,
-        name: session.user.name,
-        contactNumber: driverProfile.phone,
-        location: currentLocation,
-        vehicleNumber: driverProfile.vehicleNumber,
-        status: 'offline'
-      });
-    }
-
-    setIsActive(!isActive);
-    toast.success(!isActive ? 'You are now online' : 'You are now offline');
-  };
-
   // Get and update location
   useEffect(() => {
     let locationWatcher = null;
 
-    if (isActive && socket) {
+    if (isOnline && socket) {
       locationWatcher = navigator.geolocation.watchPosition(
         async (position) => {
           console.log('Location update received:', position.coords);
@@ -676,13 +705,7 @@ export default function DriverDashboard() {
         navigator.geolocation.clearWatch(locationWatcher);
       }
     };
-  }, [isActive, socket]);
-
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/login');
-    }
-  }, [status, router]);
+  }, [isOnline, socket]);
 
   const handleSettingsClick = () => {
     router.push('/driver/settings');
@@ -747,14 +770,14 @@ export default function DriverDashboard() {
           </div>
         </DriverInfo>
         <HeaderActions>
-          <CompactStatusCard isActive={isActive}>
+          <CompactStatusCard isActive={isOnline}>
             <div className="status-indicator" />
-            <p>{isActive ? 'Online' : 'Offline'}</p>
+            <p>{isOnline ? 'Online' : 'Offline'}</p>
             <CompactToggle
-              isActive={isActive}
+              isActive={isOnline}
               onClick={handleStatusToggle}
             >
-              {isActive ? 'Go Offline' : 'Go Online'}
+              {isOnline ? 'Go Offline' : 'Go Online'}
             </CompactToggle>
           </CompactStatusCard>
           <IconButton onClick={handleProfileClick}>
@@ -859,6 +882,13 @@ export default function DriverDashboard() {
           </RidesList>
         </Card>
       </DashboardGrid>
+
+      {/* Ride Request Notification */}
+      <RideRequestNotification
+        request={currentRequest}
+        onAccept={handleAcceptRide}
+        onReject={handleRejectRide}
+      />
     </PageContainer>
   );
 } 

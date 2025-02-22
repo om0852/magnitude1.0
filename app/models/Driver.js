@@ -118,15 +118,15 @@ const driverSchema = new mongoose.Schema({
   documents: {
     drivingLicenseImage: {
       type: String,
-      required: [true, 'Driving license image is required']
+      required: false
     },
     vehicleRegistration: {
       type: String,
-      required: [true, 'Vehicle registration document is required']
+      required: false
     },
     insurance: {
       type: String,
-      required: [true, 'Insurance document is required']
+      required: false
     },
     backgroundCheck: String
   },

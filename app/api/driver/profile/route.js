@@ -37,10 +37,19 @@ export async function PUT(req) {
       'vehicleModel',
       'walletAddress',
       'address',
+      'city',
+      'state',
+      'pincode',
       'emergencyContact'
     ];
 
-    const missingFields = requiredFields.filter(field => !data[field]);
+    const missingFields = requiredFields.filter(field => {
+      if (field === 'emergencyContact') {
+        return !data[field] || !data[field].name || !data[field].phone || !data[field].relationship;
+      }
+      return !data[field];
+    });
+
     if (missingFields.length > 0) {
       return NextResponse.json({
         error: `Missing required fields: ${missingFields.join(', ')}`
@@ -57,12 +66,6 @@ export async function PUT(req) {
         // Ensure these fields are properly set
         status: data.status || 'pending',
         isActive: data.isActive || false,
-        documents: {
-          drivingLicenseImage: data.documents?.drivingLicenseImage,
-          vehicleRegistration: data.documents?.vehicleRegistration,
-          insurance: data.documents?.insurance,
-          backgroundCheck: data.documents?.backgroundCheck
-        },
         earnings: {
           total: data.earnings?.total || 0,
           thisMonth: data.earnings?.thisMonth || 0,

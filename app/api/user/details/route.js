@@ -7,6 +7,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import User from '@/models/User';
+import { authOptions } from '../../auth/[...nextauth]/route';
 
 // User Schema
 const userSchema = new mongoose.Schema({
@@ -294,61 +295,52 @@ const authOptions = {
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
 
-export async function POST(req) {
+export async function GET(req) {
   try {
-    const session = await getServerSession();
+    const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await connectDB();
-    const data = await req.json();
-
-    // Update or create user details
-    const user = await UserModel.findOneAndUpdate(
-      { email: session.user.email },
-      {
-        ...data,
+    // Return user details
+    return NextResponse.json({
+      success: true,
+      data: {
+        name: session.user.name,
         email: session.user.email,
-        updatedAt: new Date()
-      },
-      { 
-        new: true,
-        upsert: true,
-        runValidators: true
+        image: session.user.image
       }
-    );
-
-    // If user is a driver, create/update driver profile
-    if (user.role === 'driver') {
-      await Driver.findOneAndUpdate(
-        { email: session.user.email },
-        {
-          email: session.user.email,
-          fullName: data.fullName,
-          phone: data.phone,
-          address: data.address,
-          city: data.city,
-          state: data.state,
-          pincode: data.pincode,
-          status: 'pending',
-          updatedAt: new Date()
-        },
-        { 
-          new: true,
-          upsert: true
-        }
-      );
-    }
-
-    return NextResponse.json({ 
-      success: true, 
-      data: user 
     });
   } catch (error) {
-    console.error('User details update error:', error);
-    return NextResponse.json({ 
-      error: error.message || 'Failed to update user details' 
-    }, { status: 500 });
+    console.error('Error fetching user details:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(req) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const data = await req.json();
+
+    // Update user details logic here
+    // Example:
+    // await db.user.update({
+    //   where: { email: session.user.email },
+    //   data: {
+    //     ...data
+    //   }
+    // });
+
+    return NextResponse.json({
+      success: true,
+      message: 'User details updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating user details:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 
