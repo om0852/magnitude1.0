@@ -1,23 +1,27 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function AccountPage() {
+  const router = useRouter();
   const [activeSection, setActiveSection] = useState('profile');
   const [selectedImage, setSelectedImage] = useState(null);
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [showEditAddressModal, setShowEditAddressModal] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null);
   const [savedAddresses, setSavedAddresses] = useState([]);
-  const [newAddress, setNewAddress] = useState({
-    label: '',
-    streetAddress: '',
-    city: '',
-    state: '',
-    pincode: '',
-    landmark: '',
-    instructions: ''
+  const [userData, setUserData] = useState({
+    name: "",
+    email: "",
+    phoneNumber: "",
+    profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=John",
+    joinDate: "",
+    totalRides: 0
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
@@ -25,49 +29,37 @@ export default function AccountPage() {
     newPassword: '',
     confirmPassword: ''
   });
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
+  const [newPhoneNumber, setNewPhoneNumber] = useState('');
+  const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+  const [phoneUpdateError, setPhoneUpdateError] = useState('');
   
-  // Sample user data - in a real app, this would come from an API/backend
-  const userData = {
-    name: "Atharva Kadam",
-    email: "john.doe@example.com",
-    phone: "+91 86056 35690",
-    profileImage: "https://api.dicebear.com/7.x/avataaars/svg?seed=John",
-    joinDate: "March 2024",
-    totalRides: 15,
-    walletBalance: 2500,
-    messages: [
-      { id: 1, sender: "Driver Support", message: "Your ride has been confirmed", time: "10:30 AM", date: "2024-03-20", unread: true },
-      { id: 2, sender: "System", message: "Cashback credited to your wallet", time: "Yesterday", date: "2024-03-19", unread: false },
-      { id: 3, sender: "Promotions", message: "50% off on your next ride!", time: "2 days ago", date: "2024-03-18", unread: false }
-    ],
-    savedGroups: [
-      { id: 1, name: "Family", members: 4, trips: 25, lastActive: "2024-03-20" },
-      { id: 2, name: "Office", members: 6, trips: 42, lastActive: "2024-03-19" },
-      { id: 3, name: "Friends", members: 5, trips: 30, lastActive: "2024-03-18" }
-    ],
-    accountDetails: {
-      membershipLevel: "Gold",
-      joinDate: "March 2024",
-      totalTrips: 150,
-      rating: 4.8,
-      paymentMethods: [
-        { id: 1, type: "Credit Card", last4: "4532", default: true },
-        { id: 2, type: "UPI", id: "user@upi", default: false }
-      ]
-    },
-    transactions: [
-      { id: 1, type: 'credit', amount: 500, description: 'Added money', date: '2024-03-20', status: 'completed' },
-      { id: 2, type: 'debit', amount: 200, description: 'Ride payment', date: '2024-03-19', status: 'completed' },
-      { id: 3, type: 'credit', amount: 1000, description: 'Referral bonus', date: '2024-03-18', status: 'completed' },
-      { id: 4, type: 'debit', amount: 300, description: 'Ride payment', date: '2024-03-17', status: 'completed' }
-    ],
-    preferences: {
-      notifications: true,
-      emailUpdates: false,
-      darkMode: false,
-      language: "English"
+  // Fetch user data
+  const fetchUserData = async () => {
+    try {
+      const response = await fetch('/api/user/profile');
+      if (!response.ok) {
+        throw new Error('Failed to fetch user data');
+      }
+      const data = await response.json();
+      setUserData(prev => ({
+        ...prev,
+        ...data,
+        // Format the date
+        joinDate: new Date(data.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+      }));
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      setError('Failed to load user data');
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchUserData();
+    fetchAddresses();
+  }, []);
 
   const handleImageChange = (event) => {
     const file = event.target.files[0];
@@ -205,10 +197,6 @@ export default function AccountPage() {
     }
   };
 
-  useEffect(() => {
-    fetchAddresses();
-  }, []);
-
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     
@@ -317,6 +305,108 @@ export default function AccountPage() {
           >
             Change Password
           </button>
+        </form>
+      </div>
+    </div>
+  );
+
+  const handlePhoneUpdate = async (e) => {
+    e.preventDefault();
+    setIsUpdatingPhone(true);
+    setPhoneUpdateError('');
+
+    try {
+      console.log('Updating phone number:', newPhoneNumber);
+      const response = await fetch('/api/user/update-phone', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phoneNumber: newPhoneNumber }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update phone number');
+      }
+
+      console.log('Phone number updated successfully:', data);
+      
+      // Update the local state with the new phone number
+      setUserData(prev => ({
+        ...prev,
+        phoneNumber: data.phoneNumber
+      }));
+      
+      // Show success message
+      alert('Phone number updated successfully!');
+      
+      setShowPhoneModal(false);
+      setNewPhoneNumber('');
+    } catch (error) {
+      console.error('Error updating phone number:', error);
+      setPhoneUpdateError(error.message);
+    } finally {
+      setIsUpdatingPhone(false);
+    }
+  };
+
+  const PhoneUpdateModal = () => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 w-full max-w-md">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-xl font-semibold text-gray-900">Update Phone Number</h3>
+          <button 
+            onClick={() => {
+              setShowPhoneModal(false);
+              setNewPhoneNumber('');
+              setPhoneUpdateError('');
+            }}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={handlePhoneUpdate} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1">
+              New Phone Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              required
+              value={newPhoneNumber}
+              onChange={(e) => setNewPhoneNumber(e.target.value)}
+              className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder="Enter new phone number"
+            />
+          </div>
+          {phoneUpdateError && (
+            <p className="text-red-600 text-sm">{phoneUpdateError}</p>
+          )}
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setShowPhoneModal(false);
+                setNewPhoneNumber('');
+                setPhoneUpdateError('');
+              }}
+              className="flex-1 px-4 py-2 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isUpdatingPhone}
+              className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-purple-300"
+            >
+              {isUpdatingPhone ? 'Updating...' : 'Update Phone'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
@@ -585,6 +675,28 @@ export default function AccountPage() {
   );
 
   const renderSection = () => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-700"></div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={fetchUserData}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
     switch (activeSection) {
       case 'profile':
         return (
@@ -639,9 +751,20 @@ export default function AccountPage() {
                     <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                     </svg>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm text-purple-600 font-medium">Phone</p>
-                      <p className="text-gray-900">{userData.phone}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-gray-900">{userData.phoneNumber || 'Not set'}</p>
+                        <button
+                          onClick={() => {
+                            setNewPhoneNumber(userData.phoneNumber || '');
+                            setShowPhoneModal(true);
+                          }}
+                          className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                        >
+                          Edit
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1337,9 +1460,40 @@ export default function AccountPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-purple-100">
-      {showPasswordModal && <PasswordChangeModal />}
-      <div className="max-w-6xl mx-auto p-6">
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-gradient-to-r from-purple-700 to-purple-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center gap-3">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
+              </svg>
+              <h1 className="text-2xl font-bold text-white">
+                RIDE<span className="text-purple-200">-</span><span className="text-purple-100">90</span>
+              </h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => router.push('/activity')}
+                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 text-white hover:bg-purple-600"
+              >
+                Activity
+              </button>
+              <button
+                onClick={() => router.push('/account')}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
+                  true ? 'bg-white text-purple-700' : 'text-white hover:bg-purple-600'
+                }`}
+              >
+                Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-1">
