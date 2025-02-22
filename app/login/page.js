@@ -17,6 +17,23 @@ const PageContainer = styled.div`
   padding: 2rem;
 `;
 
+const WebsiteName = styled.h1`
+  color: white;
+  font-size: 3rem;
+  font-weight: bold;
+  margin-bottom: 2rem;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  z-index: 2;
+  position: absolute;
+  top: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  
+  span {
+    color: #9f7aea;
+  }
+`;
+
 const FireBackground = styled.div`
   position: fixed;
   top: 0;
@@ -272,7 +289,25 @@ export default function LoginPage() {
   };
 
   const handleGoogleLogin = async () => {
-    await signIn('google', { callbackUrl: '/' });
+    try {
+      setIsLoading(true);
+      const result = await signIn('google', {
+        callbackUrl: '/',
+        redirect: false,
+      });
+      
+      if (result?.error) {
+        console.error('Google Sign-in Error:', result.error);
+        setErrors({ submit: 'Google sign-in failed. Please try again.' });
+      } else if (result?.url) {
+        window.location.href = result.url;
+      }
+    } catch (error) {
+      console.error('Sign-in error:', error);
+      setErrors({ submit: 'An error occurred during sign-in.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const fireballs = Array.from({ length: 15 }).map((_, i) => ({
@@ -282,6 +317,10 @@ export default function LoginPage() {
 
   return (
     <PageContainer>
+      <WebsiteName>
+        Ride<span>90</span>
+      </WebsiteName>
+
       <FireBackground>
         <AnimatePresence>
           {fireballs.map((fireball) => (
@@ -335,6 +374,15 @@ export default function LoginPage() {
           </WelcomeText>
 
           <form onSubmit={handleLogin}>
+            {errors.submit && (
+              <ErrorMessage
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{ marginBottom: '1rem', textAlign: 'center' }}
+              >
+                {errors.submit}
+              </ErrorMessage>
+            )}
             <InputGroup>
               <InputIcon>📧</InputIcon>
               <Input
