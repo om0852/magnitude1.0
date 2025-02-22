@@ -8,6 +8,8 @@ import { motion } from 'framer-motion';
 import { FaCar, FaMoneyBillWave, FaRoute, FaUserClock, FaCog, FaUser } from 'react-icons/fa';
 import { MdLocationOn, MdTimer } from 'react-icons/md';
 import Image from 'next/image';
+import io from 'socket.io-client';
+import toast, { Toaster } from 'react-hot-toast';
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -335,6 +337,8 @@ export default function DriverDashboard() {
   const router = useRouter();
   const [isActive, setIsActive] = useState(false);
   const [selectedTab, setSelectedTab] = useState('today');
+  const [socket, setSocket] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [earnings, setEarnings] = useState({
     today: 2500,
     yesterday: 3200,
@@ -347,6 +351,119 @@ export default function DriverDashboard() {
     todayCompleted: 8,
     rating: 4.8
   });
+
+  // Initialize socket connection
+  useEffect(() => {
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+
+    // Socket event listeners
+    newSocket.on('connect', () => {
+      console.log('Connected to socket server');
+      toast.success('Connected to dispatch system');
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('Disconnected from socket server');
+      toast.error('Disconnected from dispatch system');
+    });
+
+    newSocket.on('driversListUpdated', (drivers) => {
+      console.log('Drivers list updated:', drivers);
+      // Handle updated drivers list if needed
+    });
+
+    // Cleanup on unmount
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, []);
+
+  // Get and update location
+  useEffect(() => {
+    let locationWatcher = null;
+
+    if (isActive && socket) {
+      // Watch for location changes
+      locationWatcher = navigator.geolocation.watchPosition(
+        (position) => {
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setCurrentLocation(location);
+          
+          // Send location update to socket server
+          socket.emit('updateLocation', location);
+        },
+        (error) => {
+          console.error('Location error:', error);
+          toast.error('Unable to get location');
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 0
+        }
+      );
+    }
+
+    return () => {
+      if (locationWatcher) {
+        navigator.geolocation.clearWatch(locationWatcher);
+      }
+    };
+  }, [isActive, socket]);
+
+  // Update driver status
+  useEffect(() => {
+    if (socket && session?.user) {
+      const driverInfo = {
+        name: session.user.name,
+        location: currentLocation,
+        vehicleNumber: 'YOUR_VEHICLE_NUMBER', // You should get this from your driver profile
+        status: isActive ? 'active' : 'inactive'
+      };
+
+      socket.emit('updateDriverInfo', driverInfo);
+    }
+  }, [isActive, currentLocation, session, socket]);
+
+  // Handle status toggle
+  const handleStatusToggle = async () => {
+    if (!socket) {
+      toast.error('Not connected to dispatch system');
+      return;
+    }
+
+    if (!currentLocation && !isActive) {
+      // Request location permission when going online
+      try {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+        
+        setCurrentLocation({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+      } catch (error) {
+        console.error('Location error:', error);
+        toast.error('Location access is required to go online');
+        return;
+      }
+    }
+
+    const newStatus = !isActive;
+    setIsActive(newStatus);
+    
+    // Update status on socket server
+    socket.emit('updateDriverStatus', newStatus ? 'active' : 'inactive');
+    
+    toast.success(newStatus ? 'You are now online' : 'You are now offline');
+  };
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -395,6 +512,16 @@ export default function DriverDashboard() {
 
   return (
     <PageContainer>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#333',
+            color: '#fff',
+          },
+        }}
+      />
       <Header>
         <DriverInfo>
           <div className="avatar">
@@ -411,7 +538,7 @@ export default function DriverDashboard() {
             <p>{isActive ? 'Online' : 'Offline'}</p>
             <CompactToggle
               isActive={isActive}
-              onClick={() => setIsActive(!isActive)}
+              onClick={handleStatusToggle}
             >
               {isActive ? 'Go Offline' : 'Go Online'}
             </CompactToggle>
@@ -424,6 +551,12 @@ export default function DriverDashboard() {
           </IconButton>
         </HeaderActions>
       </Header>
+
+      {currentLocation && (
+        <div style={{ margin: '1rem 0', padding: '1rem', background: '#f0f9ff', borderRadius: '0.5rem' }}>
+          <p>Current Location: {currentLocation.lat.toFixed(6)}, {currentLocation.lng.toFixed(6)}</p>
+        </div>
+      )}
 
       <DashboardGrid>
         <EarningsCard>
