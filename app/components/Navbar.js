@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import styled from 'styled-components';
 
 const NavContainer = styled.nav`
@@ -191,6 +191,11 @@ const MobileLoginButton = styled(LoginButton)`
 const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
+
+    const handleLoginClick = () => {
+        router.push('/login');
+    };
 
     return (
         <NavContainer>
@@ -214,7 +219,7 @@ const Navbar = () => {
                     </LogoContainer>
 
                     <LoginButtonContainer>
-                        <LoginButton>Login</LoginButton>
+                        <LoginButton onClick={handleLoginClick}>Login</LoginButton>
                     </LoginButtonContainer>
 
                     <MobileMenuButton onClick={() => setIsMenuOpen(!isMenuOpen)}>
@@ -238,8 +243,10 @@ const Navbar = () => {
                     <MobileLink href="/service">Service</MobileLink>
                     <MobileLink href="/activity">Activity</MobileLink>
                     <MobileLink href="/account">Account</MobileLink>
+                    <MobileLink href="/settings">Settings</MobileLink>
+                    <MobileLink href="/contact">Contact</MobileLink>
                     <MobileLink href="/about">About Us</MobileLink>
-                    <MobileLoginButton>Login</MobileLoginButton>
+                    <MobileLoginButton onClick={handleLoginClick}>Login</MobileLoginButton>
                 </MobileMenuContent>
             </MobileMenu>
         </NavContainer>

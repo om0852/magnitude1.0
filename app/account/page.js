@@ -45,6 +45,64 @@ export default function AccountPage() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [loginHistoryError, setLoginHistoryError] = useState(null);
   const [showLoginHistoryModal, setShowLoginHistoryModal] = useState(false);
+  const [settings, setSettings] = useState({
+    notifications: {
+      pushNotifications: true,
+      emailNotifications: true,
+      rideUpdates: true,
+      promotionalEmails: false,
+    },
+    appearance: {
+      theme: 'light',
+      language: 'en'
+    },
+    privacy: {
+      shareLocation: true,
+      shareRideHistory: true,
+      allowDataCollection: true,
+    }
+  });
+
+  const handleSettingsToggle = (category, setting) => {
+    setSettings(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [setting]: !prev[category][setting]
+      }
+    }));
+  };
+
+  const handleSettingsSelect = (category, setting, value) => {
+    setSettings(prev => ({
+      ...prev,
+      [category]: {
+        ...prev[category],
+        [setting]: value
+      }
+    }));
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save settings');
+      }
+
+      alert('Settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert('Failed to save settings. Please try again.');
+    }
+  };
 
   // Fetch user data
   const fetchUserData = async () => {
@@ -740,29 +798,145 @@ export default function AccountPage() {
     ));
   };
 
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Logout failed');
+      }
+
+      setUserData(null);
+      router.push('/');
+    } catch (error) {
+      console.error('Error during logout:', error);
+      alert('Failed to log out. Please try again.');
+    }
+  };
+
+  const renderSettingsSection = () => {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-6 rounded-xl shadow-md">
+          <h2 className="text-2xl font-semibold text-purple-900 mb-6">Notifications</h2>
+          <div className="space-y-4">
+            {Object.entries(settings.notifications).map(([key, value]) => (
+              <div key={key} className="flex items-center justify-between">
+                <label className="text-purple-800 font-medium capitalize">
+                  {key.replace(/([A-Z])/g, ' $1').trim()}
+                </label>
+                <div className="relative inline-block w-12 h-6 transition duration-200 ease-in-out">
+                  <input
+                    type="checkbox"
+                    className="opacity-0 w-0 h-0"
+                    checked={value}
+                    onChange={() => handleSettingsToggle('notifications', key)}
+                  />
+                  <span className={`absolute cursor-pointer inset-0 rounded-full transition-all duration-300 ${
+                    value ? 'bg-purple-600' : 'bg-gray-300'
+                  }`}>
+                    <span className={`absolute w-4 h-4 bg-white rounded-full transition-transform duration-300 transform ${
+                      value ? 'translate-x-7' : 'translate-x-1'
+                    } top-1`} />
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-md">
+          <h2 className="text-2xl font-semibold text-purple-900 mb-6">Appearance</h2>
+          <div className="space-y-4">
+            {Object.entries(settings.appearance).map(([key, value]) => (
+              <div key={key} className="flex flex-col space-y-2">
+                <label className="text-purple-800 font-medium capitalize">
+                  {key.replace(/([A-Z])/g, ' $1').trim()}
+                </label>
+                <select
+                  value={value}
+                  onChange={(e) => handleSettingsSelect('appearance', key, e.target.value)}
+                  className="w-full p-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-purple-700"
+                >
+                  {key === 'theme' && (
+                    <>
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="system">System</option>
+                    </>
+                  )}
+                  {key === 'language' && (
+                    <>
+                      <option value="en">English</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-md">
+          <h2 className="text-2xl font-semibold text-purple-900 mb-6">Privacy</h2>
+          <div className="space-y-4">
+            {Object.entries(settings.privacy).map(([key, value]) => (
+              <div key={key} className="flex items-center justify-between">
+                <label className="text-purple-800 font-medium capitalize">
+                  {key.replace(/([A-Z])/g, ' $1').trim()}
+                </label>
+                <div className="relative inline-block w-12 h-6 transition duration-200 ease-in-out">
+                  <input
+                    type="checkbox"
+                    className="opacity-0 w-0 h-0"
+                    checked={value}
+                    onChange={() => handleSettingsToggle('privacy', key)}
+                  />
+                  <span className={`absolute cursor-pointer inset-0 rounded-full transition-all duration-300 ${
+                    value ? 'bg-purple-600' : 'bg-gray-300'
+                  }`}>
+                    <span className={`absolute w-4 h-4 bg-white rounded-full transition-transform duration-300 transform ${
+                      value ? 'translate-x-7' : 'translate-x-1'
+                    } top-1`} />
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-xl shadow-md">
+          <h2 className="text-2xl font-semibold text-purple-900 mb-6">Account Actions</h2>
+          <div className="space-y-4">
+            <button
+              onClick={handleLogout}
+              disabled={!userData}
+              className={`w-full py-3 rounded-lg transition-colors duration-300 font-semibold ${
+                userData 
+                  ? 'bg-red-500 text-white hover:bg-red-600' 
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {userData ? 'Log Out' : 'Not Logged In'}
+            </button>
+          </div>
+        </div>
+
+        <button
+          onClick={handleSaveSettings}
+          className="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700 transition-colors duration-300 font-semibold"
+        >
+          Save Settings
+        </button>
+      </div>
+    );
+  };
+
   const renderSection = () => {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-700"></div>
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64">
-          <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={fetchUserData}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
-          >
-            Try Again
-          </button>
-        </div>
-      );
-    }
-
     switch (activeSection) {
       case 'profile':
         return (
@@ -842,6 +1016,10 @@ export default function AccountPage() {
             </div>
           </div>
         );
+      case 'addresses':
+        return renderAddressSection();
+      case 'settings':
+        return renderSettingsSection();
       case 'wallet':
         return (
           <div className="space-y-6">
@@ -1454,6 +1632,76 @@ export default function AccountPage() {
             </div>
           </div>
         );
+      case 'settings':
+        return renderSettingsSection();
+      case 'contact':
+        return (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-2xl font-semibold text-purple-900 mb-6">Contact Us</h2>
+            <form onSubmit={handleContactSubmit} className="space-y-6">
+              <div>
+                <label htmlFor="subject" className="block text-sm font-medium text-purple-900 mb-2">
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  id="subject"
+                  name="subject"
+                  className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="message" className="block text-sm font-medium text-purple-900 mb-2">
+                  Message
+                </label>
+                <textarea
+                  id="message"
+                  name="message"
+                  rows="6"
+                  className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  required
+                ></textarea>
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-200"
+              >
+                Send Message
+              </button>
+            </form>
+            
+            <div className="mt-8 border-t border-purple-100 pt-6">
+              <h3 className="text-lg font-semibold text-purple-900 mb-4">Other Ways to Reach Us</h3>
+              <div className="space-y-4">
+                <div className="flex items-start space-x-4">
+                  <div className="text-purple-600">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-purple-900">Phone Support</h4>
+                    <p className="text-gray-600">+91 78238 86905</p>
+                  </div>
+                </div>
+                <div className="flex items-start space-x-4">
+                  <div className="text-purple-600">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-purple-900">Email Support</h4>
+                    <p className="text-gray-600">teamhado90@gmail.com</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return renderProfileSection();
     }
   };
 
@@ -1550,135 +1798,151 @@ export default function AccountPage() {
     </div>
   );
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-gradient-to-r from-purple-700 to-purple-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center gap-3">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />
-              </svg>
-              <h1 className="text-2xl font-bold text-white">
-                RIDE<span className="text-purple-200">-</span><span className="text-purple-100">90</span>
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => router.push('/activity')}
-                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 text-white hover:bg-purple-600"
-              >
-                Activity
-              </button>
-              <button
-                onClick={() => router.push('/account')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
-                  true ? 'bg-white text-purple-700' : 'text-white hover:bg-purple-600'
-                }`}
-              >
-                Account
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+  // Add the contact form handler
+  const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    const formData = {
+      subject: e.target.subject.value,
+      message: e.target.message.value,
+    };
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div className="md:col-span-1">
-              <div className="space-y-2">
-                <SectionButton
-                  section="profile"
-                  label="Profile"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  }
-                />
-                <SectionButton
-                  section="wallet"
-                  label="Wallet"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                  }
-                />
-                <SectionButton
-                  section="messages"
-                  label="Messages"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
-                    </svg>
-                  }
-                />
-                <SectionButton
-                  section="manageAccount"
-                  label="Manage Uber Account"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  }
-                />
-                <SectionButton
-                  section="sendGift"
-                  label="Send a Gift"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                    </svg>
-                  }
-                />
-                <SectionButton
-                  section="business"
-                  label="Business Account"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  }
-                />
-                <SectionButton
-                  section="preferences"
-                  label="Preferences"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  }
-                />
-                <SectionButton
-                  section="security"
-                  label="Security"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  }
-                />
-                <SectionButton
-                  section="legal"
-                  label="Legal"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  }
-                />
-              </div>
-            </div>
-            <div className="md:col-span-3">
-              {renderSection()}
-            </div>
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      alert('Message sent successfully!');
+      e.target.reset();
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-purple-50 pt-20 pb-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-[250px,1fr] gap-6">
+          {/* Sidebar */}
+          <div className="space-y-3">
+            <SectionButton
+              section="profile"
+              label="Profile"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="settings"
+              label="Settings"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="wallet"
+              label="Wallet"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="messages"
+              label="Messages"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="manageAccount"
+              label="Manage Your Account"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="sendGift"
+              label="Send a Gift"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="business"
+              label="Business Account"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="contact"
+              label="Contact Us"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="preferences"
+              label="Preferences"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="security"
+              label="Security"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              }
+            />
+            <SectionButton
+              section="legal"
+              label="Legal"
+              icon={
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              }
+            />
+          </div>
+
+          {/* Main Content */}
+          <div>
+            {renderSection()}
           </div>
         </div>
       </div>
+      {/* ... existing modals ... */}
     </div>
   );
 } 
