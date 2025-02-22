@@ -8,6 +8,8 @@ import { motion } from 'framer-motion';
 import { FaCar, FaMoneyBillWave, FaRoute, FaUserClock, FaCog, FaUser } from 'react-icons/fa';
 import { MdLocationOn, MdTimer } from 'react-icons/md';
 import Image from 'next/image';
+import io from 'socket.io-client';
+import toast, { Toaster } from 'react-hot-toast';
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -330,11 +332,47 @@ const CompactToggle = styled(StatusToggle)`
   font-size: 0.8rem;
 `;
 
+const LocationCard = styled.div`
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #f0f9ff;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  .location-icon {
+    color: #3b82f6;
+    flex-shrink: 0;
+  }
+
+  .location-details {
+    flex: 1;
+
+    h4 {
+      font-weight: 500;
+      color: #1e40af;
+      margin: 0 0 0.25rem 0;
+    }
+
+    p {
+      color: #64748b;
+      margin: 0;
+      font-size: 0.9rem;
+    }
+  }
+`;
+
 export default function DriverDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [isActive, setIsActive] = useState(false);
   const [selectedTab, setSelectedTab] = useState('today');
+  const [socket, setSocket] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [currentAddress, setCurrentAddress] = useState(null);
+  const [driverProfile, setDriverProfile] = useState(null);
+  const [driverId, setDriverId] = useState(null);
   const [earnings, setEarnings] = useState({
     today: 2500,
     yesterday: 3200,
@@ -347,6 +385,280 @@ export default function DriverDashboard() {
     todayCompleted: 8,
     rating: 4.8
   });
+
+  // Generate or get driver ID
+  const generateDriverId = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let id = '';
+    for (let i = 0; i < 6; i++) {
+      id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return 'DRV' + id;
+  };
+
+  // Update driver status in MongoDB
+  const updateDriverStatusInDB = async (isOnline) => {
+    try {
+      const response = await fetch('/api/driver/status', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          isActive: isOnline,
+          lastLocation: currentLocation,
+          lastAddress: currentAddress?.full,
+          driverId: driverId
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('Error updating driver status:', error);
+      toast.error('Failed to update status in database');
+    }
+  };
+
+  // Fetch driver profile
+  useEffect(() => {
+    const fetchDriverProfile = async () => {
+      try {
+        const response = await fetch('/api/driver/profile');
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          setDriverProfile(data.data);
+          // Generate driver ID if not exists and update it in the database
+          const newDriverId = data.data.driverId || generateDriverId();
+          setDriverId(newDriverId);
+          
+          // If there was no driver ID, update it in the database
+          if (!data.data.driverId) {
+            await updateDriverStatusInDB(false); // This will save the new driver ID
+          }
+        } else {
+          console.error('Failed to fetch driver profile:', data.error);
+          toast.error('Failed to load driver profile');
+        }
+      } catch (error) {
+        console.error('Error fetching driver profile:', error);
+        toast.error('Error loading driver profile');
+      }
+    };
+
+    if (session?.user) {
+      fetchDriverProfile();
+    }
+  }, [session]);
+
+  // Function to get address from coordinates using OpenStreetMap
+  const getAddressFromCoordinates = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        {
+          headers: {
+            'Accept-Language': 'en-US,en;q=0.9',
+            'User-Agent': 'Magnitude Application'
+          }
+        }
+      );
+      const data = await response.json();
+      console.log('Nominatim response:', data);
+      
+      if (data && data.address) {
+        setCurrentAddress({
+          full: data.display_name,
+          area: data.address.suburb || data.address.neighbourhood || data.address.residential,
+          city: data.address.city || data.address.town,
+          state: data.address.state
+        });
+      } else {
+        console.error('Invalid geocoding response:', data);
+        toast.error('Unable to get address details');
+      }
+    } catch (error) {
+      console.error('Error getting address:', error);
+      toast.error('Unable to get address details');
+    }
+  };
+
+  // Initialize socket connection
+  useEffect(() => {
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+
+    // Socket event listeners
+    newSocket.on('connect', () => {
+      console.log('Connected to socket server');
+      toast.success('Connected to dispatch system');
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('Disconnected from socket server');
+      toast.error('Disconnected from dispatch system');
+    });
+
+    newSocket.on('driversListUpdated', (drivers) => {
+      console.log('Drivers list updated:', drivers);
+      // Handle updated drivers list if needed
+    });
+
+    // Cleanup on unmount
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
+  }, []);
+
+  // Get and update location
+  useEffect(() => {
+    let locationWatcher = null;
+
+    if (isActive && socket) {
+      locationWatcher = navigator.geolocation.watchPosition(
+        async (position) => {
+          console.log('Location update received:', position.coords);
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setCurrentLocation(location);
+          
+          // Get address for the new location using OpenStreetMap
+          await getAddressFromCoordinates(location.lat, location.lng);
+          
+          // Send location update to socket server
+          socket.emit('updateLocation', location);
+        },
+        (error) => {
+          console.error('Location error:', error);
+          let errorMessage = 'Unable to get location';
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Please enable location access to go online';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Location information is unavailable';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Location request timed out';
+              break;
+          }
+          toast.error(errorMessage);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 0
+        }
+      );
+    }
+
+    return () => {
+      if (locationWatcher) {
+        navigator.geolocation.clearWatch(locationWatcher);
+      }
+    };
+  }, [isActive, socket]);
+
+  // Update driver status with all required information
+  useEffect(() => {
+    if (socket && session?.user && driverProfile) {
+      const driverInfo = {
+        driverId: driverId,
+        name: session.user.name,
+        contactNumber: driverProfile.phone,
+        location: currentLocation,
+        address: currentAddress?.full,
+        vehicleNumber: driverProfile.vehicleNumber,
+        status: isActive ? 'active' : 'inactive'
+      };
+
+      socket.emit('updateDriverInfo', driverInfo);
+    }
+  }, [isActive, currentLocation, currentAddress, session, socket, driverProfile, driverId]);
+
+  // Handle status toggle with MongoDB update
+  const handleStatusToggle = async () => {
+    if (!socket) {
+      toast.error('Not connected to dispatch system');
+      return;
+    }
+
+    if (!driverProfile?.phone) {
+      toast.error('Please complete your profile with contact number');
+      router.push('/driver/profile');
+      return;
+    }
+
+    if (!isActive) {
+      try {
+        console.log('Requesting location permission...');
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 20000,
+            maximumAge: 0
+          });
+        });
+        
+        console.log('Initial location received:', position.coords);
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        setCurrentLocation(location);
+        
+        // Get initial address using OpenStreetMap
+        await getAddressFromCoordinates(location.lat, location.lng);
+        
+        // Generate new driver ID when going online
+        const newDriverId = generateDriverId();
+        setDriverId(newDriverId);
+        
+        // Update status in MongoDB with new driver ID
+        await updateDriverStatusInDB(true);
+
+        // Update socket with new driver ID
+        if (socket && session?.user && driverProfile) {
+          const driverInfo = {
+            driverId: newDriverId,
+            name: session.user.name,
+            contactNumber: driverProfile.phone,
+            location: location,
+            address: currentAddress?.full,
+            vehicleNumber: driverProfile.vehicleNumber,
+            status: 'active'
+          };
+          socket.emit('updateDriverInfo', driverInfo);
+        }
+      } catch (error) {
+        console.error('Initial location error:', error);
+        let errorMessage = 'Location access is required to go online';
+        if (error.code === 1) {
+          errorMessage = 'Please enable location access in your browser settings';
+        }
+        toast.error(errorMessage);
+        return;
+      }
+    } else {
+      // Update status in MongoDB when going offline
+      await updateDriverStatusInDB(false);
+    }
+
+    const newStatus = !isActive;
+    setIsActive(newStatus);
+    
+    // Update status on socket server
+    socket.emit('updateDriverStatus', newStatus ? 'active' : 'inactive');
+    
+    toast.success(newStatus ? 'You are now online' : 'You are now offline');
+  };
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -395,6 +707,16 @@ export default function DriverDashboard() {
 
   return (
     <PageContainer>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#333',
+            color: '#fff',
+          },
+        }}
+      />
       <Header>
         <DriverInfo>
           <div className="avatar">
@@ -402,7 +724,8 @@ export default function DriverDashboard() {
           </div>
           <div className="info">
             <h3>{session?.user?.name || 'Driver Name'}</h3>
-            <p>ID: DRV{Math.random().toString(36).substr(2, 6).toUpperCase()}</p>
+            <p>ID: {driverId || 'Loading...'}</p>
+            <p>Vehicle: {driverProfile?.vehicleNumber || 'Loading...'}</p>
           </div>
         </DriverInfo>
         <HeaderActions>
@@ -411,7 +734,7 @@ export default function DriverDashboard() {
             <p>{isActive ? 'Online' : 'Offline'}</p>
             <CompactToggle
               isActive={isActive}
-              onClick={() => setIsActive(!isActive)}
+              onClick={handleStatusToggle}
             >
               {isActive ? 'Go Offline' : 'Go Online'}
             </CompactToggle>
@@ -424,6 +747,23 @@ export default function DriverDashboard() {
           </IconButton>
         </HeaderActions>
       </Header>
+
+      {currentLocation && (
+        <LocationCard>
+          <MdLocationOn size={24} className="location-icon" />
+          <div className="location-details">
+            <h4>Current Location</h4>
+            {currentAddress ? (
+              <>
+                <p>{currentAddress.area}, {currentAddress.city}</p>
+                <p style={{ fontSize: '0.8rem' }}>{currentAddress.full}</p>
+              </>
+            ) : (
+              <p>Getting address...</p>
+            )}
+          </div>
+        </LocationCard>
+      )}
 
       <DashboardGrid>
         <EarningsCard>

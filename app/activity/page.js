@@ -209,7 +209,7 @@ export default function ActivityPage() {
       <div className="min-h-screen trustworthy-bg">
         <div className="header-bg">
           <div className="max-w-6xl mx-auto p-6">
-            <div className="py-8">
+            <div className="py-8 mt-16">
               <div className="flex items-center gap-4 mb-6">
                 <div className="flex items-center gap-3">
                   <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
