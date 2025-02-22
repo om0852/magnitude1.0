@@ -689,9 +689,10 @@ const ConnectingText = styled.div`
 export default function BookRide() {
   const searchParams = useSearchParams();
   const vehicleType = parseInt(searchParams.get('type') || '1', 10);
+  const presetDestination = searchParams.get('to');
   
   const [fromLocation, setFromLocation] = useState('');
-  const [toLocation, setToLocation] = useState('');
+  const [toLocation, setToLocation] = useState(presetDestination || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [fromSuggestions, setFromSuggestions] = useState([]);
@@ -859,8 +860,11 @@ export default function BookRide() {
   };
 
   useEffect(() => {
+    if (presetDestination) {
+      setToLocation(presetDestination);
+    }
     getCurrentLocation();
-  }, []);
+  }, [presetDestination]);
 
   // Function to get coordinates from address
   const getCoordinates = async (address) => {
