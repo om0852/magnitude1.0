@@ -18,6 +18,12 @@ export default function AccountPage() {
     instructions: ''
   });
   const fileInputRef = useRef(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
   
   // Sample user data - in a real app, this would come from an API/backend
   const userData = {
@@ -401,6 +407,119 @@ export default function AccountPage() {
       </div>
     </div>
   );
+
+  const PasswordChangeModal = () => {
+    const handlePasswordChange = (e) => {
+      e.preventDefault();
+      
+      // Validate passwords
+      if (!passwordData.oldPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+        alert('All fields are required');
+        return;
+      }
+
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        alert('New passwords do not match');
+        return;
+      }
+
+      if (passwordData.newPassword.length < 8) {
+        alert('New password must be at least 8 characters long');
+        return;
+      }
+
+      // Here you would make an API call to verify old password and update to new password
+      // For now, we'll simulate a successful password change
+      alert('Password changed successfully!');
+      setShowPasswordModal(false);
+      setPasswordData({
+        oldPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl p-6 w-full max-w-md">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-semibold text-gray-900">Change Password</h3>
+            <button 
+              onClick={() => {
+                setShowPasswordModal(false);
+                setPasswordData({
+                  oldPassword: '',
+                  newPassword: '',
+                  confirmPassword: ''
+                });
+              }}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Current Password <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Enter your current password"
+                value={passwordData.oldPassword}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, oldPassword: e.target.value }))}
+                className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-black"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                New Password <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Enter new password"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-black"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm New Password <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="password"
+                required
+                placeholder="Confirm new password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                className="w-full px-4 py-2 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-black"
+              />
+            </div>
+
+            <div className="pt-4">
+              <button
+                type="submit"
+                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-300 flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Change Password
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  };
 
   const renderSection = () => {
     switch (activeSection) {
@@ -979,17 +1098,24 @@ export default function AccountPage() {
       case 'security':
         return (
           <div className="space-y-6">
+            {showPasswordModal && <PasswordChangeModal />}
             <h2 className="text-2xl font-bold text-gray-900">Security Settings</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">Password</h3>
                 <div className="bg-purple-50 rounded-xl p-4 space-y-4">
-                  <button className="w-full px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 transition-colors duration-300 font-medium border border-purple-200 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setShowPasswordModal(true)}
+                    className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-300 flex items-center justify-center gap-2"
+                  >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                     </svg>
                     Change Password
                   </button>
+                  <p className="text-sm text-gray-600">
+                    Last changed: 30 days ago
+                  </p>
                 </div>
               </div>
 
@@ -999,7 +1125,7 @@ export default function AccountPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium text-gray-900">Enable 2FA</p>
-                      <p className="text-sm text-gray-500">Add an extra layer of security</p>
+                      <p className="text-sm text-gray-600">Add an extra layer of security</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input type="checkbox" className="sr-only peer" />
