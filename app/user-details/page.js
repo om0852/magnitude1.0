@@ -4,51 +4,115 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
-import { motion } from 'framer-motion';
-import Image from 'next/image';
+import { FaUser, FaCar, FaIdCard, FaPhone, FaEnvelope, FaMapMarkerAlt } from 'react-icons/fa';
+import toast, { Toaster } from 'react-hot-toast';
 
 const PageContainer = styled.div`
   min-height: 100vh;
-  background: linear-gradient(135deg, #6b46c1 0%, #4a148c 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  background: linear-gradient(to bottom right, #f8fafc, #f1f5f9);
   padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
-const WebsiteName = styled.h1`
+const Card = styled.div`
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  max-width: 600px;
+  overflow: hidden;
+`;
+
+const CardHeader = styled.div`
+  background: linear-gradient(135deg, #9f7aea, #6b46c1);
+  padding: 2rem;
   color: white;
-  font-size: 3rem;
-  font-weight: bold;
-  margin-bottom: 2rem;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  
-  span: {
-    color: #9f7aea;
+  text-align: center;
+
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 0.5rem;
+  }
+
+  p {
+    opacity: 0.9;
   }
 `;
 
-const FormContainer = styled(motion.div)`
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  padding: 2.5rem;
-  border-radius: 1.5rem;
-  width: 100%;
-  max-width: 600px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+const CardBody = styled.div`
+  padding: 2rem;
 `;
 
-const Title = styled.h1`
-  color: white;
+const RoleOptions = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
   margin-bottom: 2rem;
-  font-size: 2rem;
+`;
+
+const RoleCard = styled.div`
+  border: 2px solid ${props => props.selected ? '#9f7aea' : '#e2e8f0'};
+  border-radius: 0.75rem;
+  padding: 1.5rem;
   text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: ${props => props.selected ? 'rgba(159, 122, 234, 0.1)' : 'white'};
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  svg {
+    font-size: 2rem;
+    color: ${props => props.selected ? '#9f7aea' : '#718096'};
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    color: ${props => props.selected ? '#9f7aea' : '#2d3748'};
+    margin-bottom: 0.5rem;
+  }
+
+  p {
+    color: #718096;
+    font-size: 0.875rem;
+  }
+`;
+
+const ContinueButton = styled.button`
+  background: linear-gradient(135deg, #9f7aea, #6b46c1);
+  color: white;
+  border: none;
+  width: 100%;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(107, 70, 193, 0.2);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+  }
 `;
 
 const Form = styled.form`
+  margin-top: 2rem;
+`;
+
+const FormGrid = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.5rem;
 
   @media (max-width: 768px) {
@@ -56,201 +120,103 @@ const Form = styled.form`
   }
 `;
 
-const InputGroup = styled.div`
-  position: relative;
-`;
+const FormGroup = styled.div`
+  margin-bottom: 1.5rem;
 
-const Label = styled.label`
-  color: rgba(255, 255, 255, 0.8);
-  display: block;
-  margin-bottom: 0.5rem;
-  font-size: 0.9rem;
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #4a5568;
+    font-weight: 500;
+  }
+
+  .input-container {
+    position: relative;
+    
+    svg {
+      position: absolute;
+      left: 1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9f7aea;
+    }
+  }
 `;
 
 const Input = styled.input`
   width: 100%;
-  padding: 0.75rem;
-  border: 2px solid ${props => props.error ? '#ff6b6b' : 'rgba(255, 255, 255, 0.2)'};
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  outline: none;
+  padding: 0.75rem 1rem 0.75rem 2.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  color: #000000;
   transition: all 0.3s ease;
 
   &:focus {
+    outline: none;
     border-color: #9f7aea;
-    box-shadow: 0 0 0 3px rgba(159, 122, 234, 0.2);
+    box-shadow: 0 0 0 3px rgba(159, 122, 234, 0.1);
   }
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.4);
-  }
-`;
-
-const TextArea = styled(Input).attrs({ as: 'textarea' })`
-  min-height: 100px;
-  resize: vertical;
-`;
-
-const ErrorMessage = styled(motion.p)`
-  color: #ff6b6b;
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-`;
-
-const Button = styled(motion.button)`
-  width: 100%;
-  padding: 1rem;
-  margin-top: 1.5rem;
-  border: none;
-  border-radius: 0.75rem;
-  background: #9f7aea;
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  grid-column: 1 / -1;
-
-  &:hover {
-    background: #805ad5;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(159, 122, 234, 0.3);
-  }
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
+    color: #a0aec0;
   }
 `;
 
 const Select = styled.select`
   width: 100%;
-  padding: 0.75rem;
-  border: 2px solid ${props => props.error ? '#ff6b6b' : 'rgba(255, 255, 255, 0.2)'};
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  outline: none;
-  transition: all 0.3s ease;
+  padding: 0.75rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+  color: #000000;
+  background: white;
   cursor: pointer;
-  appearance: none;
-  padding-right: 2rem;
 
   &:focus {
+    outline: none;
     border-color: #9f7aea;
-    box-shadow: 0 0 0 3px rgba(159, 122, 234, 0.2);
-  }
-
-  option {
-    background: #4a148c;
-    color: white;
+    box-shadow: 0 0 0 3px rgba(159, 122, 234, 0.1);
   }
 `;
 
-const SelectWrapper = styled.div`
-  position: relative;
-  
-  &::after {
-    content: '▼';
-    position: absolute;
-    right: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: rgba(255, 255, 255, 0.6);
-    pointer-events: none;
-    font-size: 0.8rem;
-  }
+const ErrorMessage = styled.p`
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
 `;
 
-export default function UserDetailsPage() {
+export default function UserDetails() {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     fullName: '',
-    phoneNumber: '',
+    email: '',
+    phone: '',
     alternatePhone: '',
+    dateOfBirth: '',
+    gender: '',
     address: '',
     city: '',
     state: '',
-    zipCode: '',
-    occupation: '',
-    dateOfBirth: '',
-    gender: '',
+    pincode: '',
+    occupation: ''
   });
 
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
+    } else if (session?.user) {
+      setFormData(prev => ({
+        ...prev,
+        fullName: session.user.name || '',
+        email: session.user.email || ''
+      }));
     }
-  }, [status, router]);
-
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.fullName) {
-      newErrors.fullName = 'Full name is required';
-    }
-    
-    if (!formData.gender) {
-      newErrors.gender = 'Please select your gender';
-    }
-    
-    if (!formData.phoneNumber) {
-      newErrors.phoneNumber = 'Phone number is required';
-    } else if (!/^\d{10}$/.test(formData.phoneNumber)) {
-      newErrors.phoneNumber = 'Please enter a valid 10-digit phone number';
-    }
-    
-    if (formData.alternatePhone && !/^\d{10}$/.test(formData.alternatePhone)) {
-      newErrors.alternatePhone = 'Please enter a valid 10-digit phone number';
-    }
-
-    if (!formData.dateOfBirth) {
-      newErrors.dateOfBirth = 'Date of birth is required';
-    } else {
-      const birthDate = new Date(formData.dateOfBirth);
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      
-      // Adjust age if birthday hasn't occurred this year
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-
-      if (age < 10) {
-        newErrors.dateOfBirth = 'You must be at least 10 years old';
-      }
-
-      // Validate that date is not in the future
-      if (birthDate > today) {
-        newErrors.dateOfBirth = 'Date of birth cannot be in the future';
-      }
-    }
-    
-    if (!formData.address) {
-      newErrors.address = 'Address is required';
-    }
-    
-    if (!formData.city) {
-      newErrors.city = 'City is required';
-    }
-    
-    if (!formData.state) {
-      newErrors.state = 'State is required';
-    }
-    
-    if (!formData.zipCode) {
-      newErrors.zipCode = 'ZIP code is required';
-    } else if (!/^\d{6}$/.test(formData.zipCode)) {
-      newErrors.zipCode = 'Please enter a valid 6-digit ZIP code';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  }, [status, session, router]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -258,48 +224,65 @@ export default function UserDetailsPage() {
       ...prev,
       [name]: value
     }));
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (!selectedRole) {
+      toast.error('Please select a role first');
+      setError('Please select a role first');
+      return;
+    }
 
-    setIsLoading(true);
+    setLoading(true);
+    setError('');
+    const loadingToast = toast.loading('Updating your profile...');
+
     try {
-      const response = await fetch('/api/user/update-details', {
+      // First update the role
+      const roleResponse = await fetch('/api/user/role', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          email: session?.user?.email,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: selectedRole }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update user details');
+      if (!roleResponse.ok) {
+        const roleData = await roleResponse.json();
+        throw new Error(roleData.error || 'Failed to update role');
       }
 
-      router.push('/dashboard'); // Redirect to dashboard after successful update
-    } catch (error) {
-      console.error('Error updating user details:', error);
-      setErrors({ submit: 'Failed to update user details. Please try again.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      // Then update user details
+      const detailsResponse = await fetch('/api/user/details', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
 
-  // Add a function to calculate max date for the date input
-  const getMaxDate = () => {
-    const today = new Date();
-    const minAge = 10;
-    const maxDate = new Date(
-      today.getFullYear() - minAge,
-      today.getMonth(),
-      today.getDate()
-    );
-    return maxDate.toISOString().split('T')[0];
+      if (!detailsResponse.ok) {
+        const detailsData = await detailsResponse.json();
+        throw new Error(detailsData.error || 'Failed to update details');
+      }
+
+      toast.success('Profile updated successfully!', {
+        id: loadingToast,
+        duration: 3000,
+      });
+
+      // Redirect based on role after a short delay
+      setTimeout(() => {
+        router.push(selectedRole === 'driver' ? '/driver/profile' : '/user/profile');
+      }, 2000);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(error.message || 'Something went wrong', {
+        id: loadingToast,
+        duration: 4000,
+      });
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (status === 'loading') {
@@ -308,182 +291,229 @@ export default function UserDetailsPage() {
 
   return (
     <PageContainer>
-      <WebsiteName>
-        Ride<span>90</span>
-      </WebsiteName>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          success: {
+            style: {
+              background: '#10B981',
+              color: 'white',
+              padding: '16px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+            },
+          },
+          error: {
+            style: {
+              background: '#EF4444',
+              color: 'white',
+              padding: '16px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+            },
+          },
+          loading: {
+            style: {
+              background: '#6B7280',
+              color: 'white',
+              padding: '16px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+            },
+          },
+        }}
+      />
+      <Card>
+        <CardHeader>
+          <h1>Welcome to Magnitude</h1>
+          <p>Please complete your profile</p>
+        </CardHeader>
 
-      <FormContainer
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Title>Complete Your Profile</Title>
-        <Form onSubmit={handleSubmit}>
-          <InputGroup>
-            <Label>Full Name</Label>
-            <Input
-              type="text"
-              name="fullName"
-              value={formData.fullName}
-              onChange={handleChange}
-              error={errors.fullName}
-              placeholder="Enter your full name"
-            />
-            {errors.fullName && <ErrorMessage>{errors.fullName}</ErrorMessage>}
-          </InputGroup>
+        <CardBody>
+          <RoleOptions>
+            <RoleCard
+              selected={selectedRole === 'user'}
+              onClick={() => setSelectedRole('user')}
+            >
+              <FaUser />
+              <h3>Passenger</h3>
+              <p>Book rides and travel with comfort</p>
+            </RoleCard>
 
-          <InputGroup>
-            <Label>Gender</Label>
-            <SelectWrapper>
-              <Select
-                name="gender"
-                value={formData.gender}
-                onChange={handleChange}
-                error={errors.gender}
-              >
-                <option value="">Select gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-                <option value="prefer_not_to_say">Prefer not to say</option>
-              </Select>
-            </SelectWrapper>
-            {errors.gender && (
-              <ErrorMessage
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {errors.gender}
-              </ErrorMessage>
-            )}
-          </InputGroup>
+            <RoleCard
+              selected={selectedRole === 'driver'}
+              onClick={() => setSelectedRole('driver')}
+            >
+              <FaCar />
+              <h3>Driver</h3>
+              <p>Earn money by driving with us</p>
+            </RoleCard>
+          </RoleOptions>
 
-          <InputGroup>
-            <Label>Phone Number</Label>
-            <Input
-              type="tel"
-              name="phoneNumber"
-              value={formData.phoneNumber}
-              onChange={handleChange}
-              error={errors.phoneNumber}
-              placeholder="Enter your phone number"
-            />
-            {errors.phoneNumber && <ErrorMessage>{errors.phoneNumber}</ErrorMessage>}
-          </InputGroup>
+          {error && <ErrorMessage>{error}</ErrorMessage>}
 
-          <InputGroup>
-            <Label>Alternate Phone (Optional)</Label>
-            <Input
-              type="tel"
-              name="alternatePhone"
-              value={formData.alternatePhone}
-              onChange={handleChange}
-              error={errors.alternatePhone}
-              placeholder="Enter alternate phone number"
-            />
-            {errors.alternatePhone && <ErrorMessage>{errors.alternatePhone}</ErrorMessage>}
-          </InputGroup>
+          <Form onSubmit={handleSubmit}>
+            <FormGrid>
+              <FormGroup>
+                <label>Full Name</label>
+                <div className="input-container">
+                  <FaUser size={16} />
+                  <Input
+                    type="text"
+                    name="fullName"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    placeholder="Enter your full name"
+                    required
+                  />
+                </div>
+              </FormGroup>
 
-          <InputGroup>
-            <Label>Date of Birth</Label>
-            <Input
-              type="date"
-              name="dateOfBirth"
-              value={formData.dateOfBirth}
-              onChange={handleChange}
-              error={errors.dateOfBirth}
-              max={getMaxDate()}
-            />
-            {errors.dateOfBirth && (
-              <ErrorMessage
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                {errors.dateOfBirth}
-              </ErrorMessage>
-            )}
-          </InputGroup>
+              <FormGroup>
+                <label>Email</label>
+                <div className="input-container">
+                  <FaEnvelope size={16} />
+                  <Input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Enter your email"
+                    required
+                    disabled
+                  />
+                </div>
+              </FormGroup>
 
-          <InputGroup style={{ gridColumn: '1 / -1' }}>
-            <Label>Address</Label>
-            <TextArea
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              error={errors.address}
-              placeholder="Enter your full address"
-            />
-            {errors.address && <ErrorMessage>{errors.address}</ErrorMessage>}
-          </InputGroup>
+              <FormGroup>
+                <label>Phone Number</label>
+                <div className="input-container">
+                  <FaPhone size={16} />
+                  <Input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="Enter your phone number"
+                    required
+                  />
+                </div>
+              </FormGroup>
 
-          <InputGroup>
-            <Label>City</Label>
-            <Input
-              type="text"
-              name="city"
-              value={formData.city}
-              onChange={handleChange}
-              error={errors.city}
-              placeholder="Enter your city"
-            />
-            {errors.city && <ErrorMessage>{errors.city}</ErrorMessage>}
-          </InputGroup>
+              <FormGroup>
+                <label>Alternate Phone</label>
+                <div className="input-container">
+                  <FaPhone size={16} />
+                  <Input
+                    type="tel"
+                    name="alternatePhone"
+                    value={formData.alternatePhone}
+                    onChange={handleChange}
+                    placeholder="Enter alternate phone number"
+                  />
+                </div>
+              </FormGroup>
 
-          <InputGroup>
-            <Label>State</Label>
-            <Input
-              type="text"
-              name="state"
-              value={formData.state}
-              onChange={handleChange}
-              error={errors.state}
-              placeholder="Enter your state"
-            />
-            {errors.state && <ErrorMessage>{errors.state}</ErrorMessage>}
-          </InputGroup>
+              <FormGroup>
+                <label>Date of Birth</label>
+                <Input
+                  type="date"
+                  name="dateOfBirth"
+                  value={formData.dateOfBirth}
+                  onChange={handleChange}
+                  required
+                />
+              </FormGroup>
 
-          <InputGroup>
-            <Label>ZIP Code</Label>
-            <Input
-              type="text"
-              name="zipCode"
-              value={formData.zipCode}
-              onChange={handleChange}
-              error={errors.zipCode}
-              placeholder="Enter ZIP code"
-            />
-            {errors.zipCode && <ErrorMessage>{errors.zipCode}</ErrorMessage>}
-          </InputGroup>
+              <FormGroup>
+                <label>Gender</label>
+                <Select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="">Select gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                  <option value="prefer_not_to_say">Prefer not to say</option>
+                </Select>
+              </FormGroup>
 
-          <InputGroup>
-            <Label>Occupation</Label>
-            <Input
-              type="text"
-              name="occupation"
-              value={formData.occupation}
-              onChange={handleChange}
-              error={errors.occupation}
-              placeholder="Enter your occupation"
-            />
-            {errors.occupation && <ErrorMessage>{errors.occupation}</ErrorMessage>}
-          </InputGroup>
+              <FormGroup style={{ gridColumn: '1 / -1' }}>
+                <label>Address</label>
+                <div className="input-container">
+                  <FaMapMarkerAlt size={16} />
+                  <Input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="Enter your address"
+                    required
+                  />
+                </div>
+              </FormGroup>
 
-          {errors.submit && (
-            <ErrorMessage style={{ gridColumn: '1 / -1', textAlign: 'center' }}>
-              {errors.submit}
-            </ErrorMessage>
-          )}
+              <FormGroup>
+                <label>City</label>
+                <Input
+                  type="text"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  placeholder="Enter your city"
+                  required
+                />
+              </FormGroup>
 
-          <Button
-            type="submit"
-            disabled={isLoading}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            {isLoading ? 'Saving...' : 'Save Details'}
-          </Button>
-        </Form>
-      </FormContainer>
+              <FormGroup>
+                <label>State</label>
+                <Input
+                  type="text"
+                  name="state"
+                  value={formData.state}
+                  onChange={handleChange}
+                  placeholder="Enter your state"
+                  required
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <label>Pincode</label>
+                <Input
+                  type="text"
+                  name="pincode"
+                  value={formData.pincode}
+                  onChange={handleChange}
+                  placeholder="Enter pincode"
+                  required
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <label>Occupation</label>
+                <Input
+                  type="text"
+                  name="occupation"
+                  value={formData.occupation}
+                  onChange={handleChange}
+                  placeholder="Enter your occupation"
+                />
+              </FormGroup>
+            </FormGrid>
+
+            <ContinueButton type="submit" disabled={loading || !selectedRole}>
+              {loading ? 'Please wait...' : 'Save & Continue'}
+            </ContinueButton>
+          </Form>
+        </CardBody>
+      </Card>
     </PageContainer>
   );
 } 
