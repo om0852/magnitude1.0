@@ -2,100 +2,214 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import styled from 'styled-components';
+
+const NavContainer = styled.nav`
+  background-color: white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  width: 100%;
+  z-index: 50;
+`;
+
+const NavInner = styled.div`
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+  @media (min-width: 640px) { padding: 0 1.5rem; }
+  @media (min-width: 1024px) { padding: 0 2rem; }
+`;
+
+const NavFlex = styled.div`
+  display: flex;
+  justify-content: space-between;
+  height: 4rem;
+`;
+
+const LogoContainer = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const LogoWrapper = styled.div`
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+`;
+
+const LogoText = styled.div`
+  display: flex;
+  align-items: center;
+`;
+
+const BrandPrimary = styled.span`
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #6D28D9;
+`;
+
+const BrandSecondary = styled.span`
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #312E81;
+`;
+
+const DesktopMenu = styled.div`
+  display: none;
+  @media (min-width: 768px) {
+    display: flex;
+    margin-left: 1.5rem;
+    gap: 2rem;
+  }
+`;
+
+const StyledLink = styled(Link)`
+  color: #374151;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color 0.3s;
+
+  &:hover {
+    color: #6D28D9;
+  }
+`;
+
+const LoginButton = styled.button`
+  background-color: #6D28D9;
+  color: white;
+  padding: 0.5rem 1.5rem;
+  border-radius: 9999px;
+  font-weight: 500;
+  transition: background-color 0.3s;
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #5B21B6;
+  }
+`;
+
+const LoginButtonContainer = styled.div`
+  display: none;
+  @media (min-width: 768px) {
+    display: flex;
+    align-items: center;
+  }
+`;
+
+const MobileMenuButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  color: #374151;
+  border: none;
+  background: none;
+  cursor: pointer;
+
+  &:hover {
+    color: #6D28D9;
+    background-color: #F5F3FF;
+  }
+
+  @media (min-width: 768px) {
+    display: none;
+  }
+`;
+
+const MobileMenu = styled.div`
+  display: ${props => props.$isOpen ? 'block' : 'none'};
+  @media (min-width: 768px) {
+    display: none;
+  }
+`;
+
+const MobileMenuContent = styled.div`
+  padding: 0.5rem;
+  @media (min-width: 640px) {
+    padding: 0.75rem;
+  }
+`;
+
+const MobileLink = styled(Link)`
+  display: block;
+  color: #374151;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+  margin-bottom: 0.5rem;
+
+  &:hover {
+    color: #6D28D9;
+  }
+`;
+
+const MobileLoginButton = styled(LoginButton)`
+  width: 100%;
+  margin-top: 1rem;
+`;
 
 const Navbar = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     return (
-        <nav className="bg-white shadow-md fixed w-full z-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex justify-between h-16">
-                    <div className="flex items-center">
-                        {/* Logo */}
-                        <div className="flex-shrink-0 flex items-center">
-                            <div className="w-32 h-8 relative">
-                                <div className="flex items-center">
-                                    <span className="text-2xl font-bold text-purple-700">Ride</span>
-                                    <span className="text-2xl font-bold text-purple-900">90</span>
-                                </div>
-                            </div>
-                        </div>
+        <NavContainer>
+            <NavInner>
+                <NavFlex>
+                    <LogoContainer>
+                        <LogoWrapper>
+                            <LogoText>
+                                <BrandPrimary>Ride</BrandPrimary>
+                                <BrandSecondary>90</BrandSecondary>
+                            </LogoText>
+                        </LogoWrapper>
 
-                        {/* Desktop Menu Items */}
-                        <div className="hidden md:ml-6 md:flex md:space-x-8">
-                            <Link href="/" className="text-gray-700 hover:text-purple-700 px-3 py-2 rounded-md text-sm font-medium">
-                                Home
-                            </Link>
-                            <Link href="/service" className="text-gray-700 hover:text-purple-700 px-3 py-2 rounded-md text-sm font-medium">
-                                Service
-                            </Link>
-                            <Link href="/activity" className="text-gray-700 hover:text-purple-700 px-3 py-2 rounded-md text-sm font-medium">
-                                Activity
-                            </Link>
-                            <Link href="/account" className="text-gray-700 hover:text-purple-700 px-3 py-2 rounded-md text-sm font-medium">
-                                Account
-                            </Link>
-                            <Link href="/about" className="text-gray-700 hover:text-purple-700 px-3 py-2 rounded-md text-sm font-medium">
-                                About Us
-                            </Link>
-                        </div>
-                    </div>
+                        <DesktopMenu>
+                            <StyledLink href="/">Home</StyledLink>
+                            <StyledLink href="/service">Service</StyledLink>
+                            <StyledLink href="/activity">Activity</StyledLink>
+                            <StyledLink href="/account">Account</StyledLink>
+                            <StyledLink href="/about">About Us</StyledLink>
+                        </DesktopMenu>
+                    </LogoContainer>
 
-                    {/* Login Button */}
-                    <div className="hidden md:flex items-center">
-                        <button className="bg-purple-700 text-white px-6 py-2 rounded-full font-medium hover:bg-purple-800 transition duration-300">
-                            Login
-                        </button>
-                    </div>
+                    <LoginButtonContainer>
+                        <LoginButton>Login</LoginButton>
+                    </LoginButtonContainer>
 
-                    {/* Mobile menu button */}
-                    <div className="flex items-center md:hidden">
-                        <button
-                            onClick={() => setIsMenuOpen(!isMenuOpen)}
-                            className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-purple-700 hover:bg-purple-50 focus:outline-none"
-                        >
-                            <span className="sr-only">Open main menu</span>
-                            {!isMenuOpen ? (
-                                <svg className="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            ) : (
-                                <svg className="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            )}
-                        </button>
-                    </div>
-                </div>
-            </div>
+                    <MobileMenuButton onClick={() => setIsMenuOpen(!isMenuOpen)}>
+                        <span className="sr-only">Open main menu</span>
+                        {!isMenuOpen ? (
+                            <svg className="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        ) : (
+                            <svg className="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        )}
+                    </MobileMenuButton>
+                </NavFlex>
+            </NavInner>
 
-            {/* Mobile menu */}
-            {isMenuOpen && (
-                <div className="md:hidden">
-                    <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                        <Link href="/" className="text-gray-700 hover:text-purple-700 block px-3 py-2 rounded-md text-base font-medium">
-                            Home
-                        </Link>
-                        <Link href="/service" className="text-gray-700 hover:text-purple-700 block px-3 py-2 rounded-md text-base font-medium">
-                            Service
-                        </Link>
-                        <Link href="/activity" className="text-gray-700 hover:text-purple-700 block px-3 py-2 rounded-md text-base font-medium">
-                            Activity
-                        </Link>
-                        <Link href="/account" className="text-gray-700 hover:text-purple-700 block px-3 py-2 rounded-md text-base font-medium">
-                            Account
-                        </Link>
-                        <Link href="/about" className="text-gray-700 hover:text-purple-700 block px-3 py-2 rounded-md text-base font-medium">
-                            About Us
-                        </Link>
-                        <button className="w-full mt-4 bg-purple-700 text-white px-6 py-2 rounded-full font-medium hover:bg-purple-800 transition duration-300">
-                            Login
-                        </button>
-                    </div>
-                </div>
-            )}
-        </nav>
+            <MobileMenu $isOpen={isMenuOpen}>
+                <MobileMenuContent>
+                    <MobileLink href="/">Home</MobileLink>
+                    <MobileLink href="/service">Service</MobileLink>
+                    <MobileLink href="/activity">Activity</MobileLink>
+                    <MobileLink href="/account">Account</MobileLink>
+                    <MobileLink href="/about">About Us</MobileLink>
+                    <MobileLoginButton>Login</MobileLoginButton>
+                </MobileMenuContent>
+            </MobileMenu>
+        </NavContainer>
     );
 };
 
-export default Navbar; 
+export default Navbar;

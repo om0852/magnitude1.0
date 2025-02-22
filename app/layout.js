@@ -22,7 +22,7 @@ export default function RootLayout({ children }) {
       <body className={`${inter.variable} antialiased`}>
         <SessionProvider>
           <StyledComponentsRegistry>
-            {/* <Navbar /> */}
+            <Navbar />
             <main>
               {children}
             </main>

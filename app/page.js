@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
+  const router = useRouter();
   const [pickupLocation, setPickupLocation] = useState('');
   const [dropLocation, setDropLocation] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -257,6 +259,7 @@ export default function Home() {
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-purple-100 p-4">
           <div className="max-w-xl mx-auto">
             <button 
+              onClick={() => selectedRide && router.push(`/book-ride?type=${selectedRide}`)}
               disabled={!selectedRide}
               className={`w-full py-4 px-6 rounded-lg font-medium transition duration-300 flex items-center justify-center space-x-2 ${
                 selectedRide 
