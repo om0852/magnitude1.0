@@ -321,20 +321,29 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     try {
       setIsLoading(true);
+      setErrors({}); // Clear any existing errors
+      
       const result = await signIn('google', {
-        callbackUrl: `/?role=${role}`,
+        callbackUrl: '/',
         redirect: false,
       });
       
       if (result?.error) {
         console.error('Google Sign-in Error:', result.error);
-        setErrors({ submit: 'Google sign-in failed. Please try again.' });
+        setErrors({ 
+          submit: result.error === "OAuthSignin" 
+            ? "Failed to connect to Google. Please try again." 
+            : result.error 
+        });
       } else if (result?.url) {
+        // Successful login, redirect
         window.location.href = result.url;
       }
     } catch (error) {
       console.error('Sign-in error:', error);
-      setErrors({ submit: 'An error occurred during sign-in.' });
+      setErrors({ 
+        submit: 'An unexpected error occurred. Please try again.' 
+      });
     } finally {
       setIsLoading(false);
     }

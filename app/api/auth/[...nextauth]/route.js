@@ -1,7 +1,7 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
-import connectDB from '../../../../app/lib/mongodb';
-import User from '../../../../app/models/User';
+import { connectDB } from '../../../lib/mongodb';
+import User from '../../../models/User';
 
 const authOptions = {
   providers: [
@@ -22,84 +22,68 @@ const authOptions = {
   },
   debug: process.env.NODE_ENV === 'development',
   callbacks: {
-    async signIn({ user, account, profile, credentials }) {
+    async signIn({ user, account, profile }) {
       if (account.provider === "google") {
         try {
           await connectDB();
           
-          // Get the role from the credentials
-          const role = credentials?.role || 'rider';
-          
           // Check if user exists
-          const existingUser = await User.findOne({ email: profile.email });
+          let existingUser = await User.findOne({ email: profile.email });
           
           if (!existingUser) {
             // Create new user if doesn't exist
-            await User.create({
+            existingUser = await User.create({
               name: profile.name,
               email: profile.email,
               image: profile.picture,
               emailVerified: profile.email_verified,
               provider: account.provider,
-              role: role,
+              role: 'rider', // Default role
+              profileCompleted: false
             });
-          } else {
-            // Update existing user
-            await User.findOneAndUpdate(
-              { email: profile.email },
-              {
-                $set: {
-                  name: profile.name,
-                  image: profile.picture,
-                  emailVerified: profile.email_verified,
-                  role: role, // Update role if changed
-                }
-              }
-            );
           }
           
+          // Always return true to allow sign in
           return true;
         } catch (error) {
           console.error('Database Error:', error);
-          return false;
+          // Still return true to allow sign in even if DB operation fails
+          return true;
         }
       }
       return true;
     },
+    
     async redirect({ url, baseUrl }) {
-      try {
-        await connectDB();
-        const user = await User.findOne({ email: url.split('=')[1] });
-        
-        // If user hasn't completed their profile, redirect to user-details page
-        if (user && !user.profileCompleted) {
-          return `${baseUrl}/user-details`;
-        }
-        
-        // Default redirect to dashboard
-        return `${baseUrl}/dashboard`;
-      } catch (error) {
-        console.error('Redirect Error:', error);
-        return baseUrl;
+      // Always allow callback URLs on the same origin
+      if (url.startsWith(baseUrl)) {
+        return url;
       }
+      // Allow redirects to relative URLs
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
+      }
+      return baseUrl;
     },
+
     async session({ session, token }) {
-      try {
-        await connectDB();
-        // Get user from database
-        const user = await User.findOne({ email: session.user.email });
-        if (user) {
-          session.user.id = user._id.toString();
-          session.user.provider = user.provider;
-          session.user.profileCompleted = user.profileCompleted;
-          session.user.role = user.role; // Add role to session
+      if (session?.user) {
+        try {
+          await connectDB();
+          // Get user from database
+          const user = await User.findOne({ email: session.user.email });
+          if (user) {
+            session.user.id = user._id.toString();
+            session.user.role = user.role || 'rider';
+            session.user.profileCompleted = user.profileCompleted || false;
+          }
+        } catch (error) {
+          console.error('Session Error:', error);
         }
-        return session;
-      } catch (error) {
-        console.error('Session Error:', error);
-        return session;
       }
+      return session;
     },
+
     async jwt({ token, account, profile }) {
       if (account) {
         token.accessToken = account.access_token;
@@ -108,8 +92,11 @@ const authOptions = {
       return token;
     },
   },
+  pages: {
+    signIn: '/login',
+    error: '/auth/error',
+  },
 };
 
 const handler = NextAuth(authOptions);
-
 export { handler as GET, handler as POST }; 
