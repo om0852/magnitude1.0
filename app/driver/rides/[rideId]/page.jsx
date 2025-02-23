@@ -25,6 +25,7 @@ const RideDetails = ({ params }) => {
   const [loading, setLoading] = useState(true);
   const [socket, setSocket] = useState(null);
   const [isVerified, setIsVerified] = useState(false);
+  const [transactionStatus, setTransactionStatus] = useState(null);
   
   // Map related states
   const [userLocation, setUserLocation] = useState(null);
@@ -41,9 +42,27 @@ const RideDetails = ({ params }) => {
     fare: '0'
   });
 
+  // Add function to check transaction status
+  const checkTransactionStatus = async () => {
+    try {
+      const response = await axios.get(`/api/transactions/${rideId}`);
+      if (response.data.success && response.data.data) {
+        setTransactionStatus(response.data.data.status);
+      }
+    } catch (error) {
+      console.error('Error checking transaction status:', error);
+    }
+  };
+
   useEffect(() => {
     console.log('RideId from params:', rideId);
     fetchRideDetails();
+    checkTransactionStatus(); // Initial check
+
+    // Set up interval to check payment status
+    const interval = setInterval(checkTransactionStatus, 10000); // Check every 10 seconds
+
+    return () => clearInterval(interval);
   }, []);
 
   // Initialize socket connection
@@ -345,6 +364,16 @@ const RideDetails = ({ params }) => {
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-600 to-purple-800 text-white p-8">
             <h1 className="text-3xl font-bold mb-2">Ride Details</h1>
+            {/* Add Payment Status Badge */}
+            <div className="flex items-center space-x-3 mb-4">
+              <div className={`px-4 py-1.5 rounded-full text-sm backdrop-blur-sm ${
+                transactionStatus === 'completed' 
+                  ? 'bg-green-500/20 text-green-100' 
+                  : 'bg-yellow-500/20 text-yellow-100'
+              }`}>
+                Payment: {transactionStatus === 'completed' ? 'Done' : 'Pending'}
+              </div>
+            </div>
             {ride.status === 'in_progress' && (
               <div className="mb-6 p-6 bg-white/20 backdrop-blur-sm rounded-xl">
                 <h2 className="text-xl font-semibold mb-4">Verify Ride OTP</h2>
@@ -478,17 +507,41 @@ const RideDetails = ({ params }) => {
               </div>
             </div>
 
-            {/* Add Web3 Integration */}
+            {/* Payment Status Section */}
             <div className="mb-8">
-              <h2 className="text-2xl font-semibold mb-4 text-purple-900">Blockchain Payment</h2>
-              <Web3Integration 
-                ride={ride} 
-                onPaymentComplete={() => {
-                  toast.success('Payment processed on blockchain');
-                  fetchRideDetails();
-                }}
-              />
+              <h2 className="text-2xl font-semibold mb-4 text-purple-900">Payment Status</h2>
+              <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-purple-900 mb-2">Status</p>
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      transactionStatus === 'completed'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {transactionStatus === 'completed' ? 'Done' : 'Pending'}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium text-purple-900 mb-2">Amount</p>
+                    <p className="text-gray-700">₹{ride.estimatedFare}</p>
+                  </div>
+                </div>
+                {transactionStatus === 'completed' && (
+                  <div className="mt-4 pt-4 border-t border-purple-100">
+                    <div className="flex items-center text-green-600">
+                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      Payment completed
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Add Web3 Integration */}
+           
 
             {/* Live Map Section */}
             <div className="mb-8">
