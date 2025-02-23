@@ -215,7 +215,7 @@ const RideDetails = ({ params }) => {
                   </div>
                   <div>
                     <p className="font-medium text-purple-900 mb-1">Phone</p>
-                    <p className="text-gray-700">{ride.driverDetails?.phone}</p>
+                    <p className="text-gray-700">{ride.driverDetails?.contactNumber}</p>
                   </div>
                   <div>
                     <p className="font-medium text-purple-900 mb-1">Vehicle</p>

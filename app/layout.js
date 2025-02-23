@@ -16,6 +16,7 @@ const inter = Inter({
 //   description: "Modern ride-sharing platform for seamless transportation",
 // };
 
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">

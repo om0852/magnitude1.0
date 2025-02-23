@@ -420,7 +420,7 @@ export default function TripDetails({ params }) {
   // Update trip coordinates
   const updateTripCoordinates = async (trip) => {
     try {
-      console.log('Full trip data:', trip);
+      console.log('Updating coordinates for trip:', trip);
 
       // Get pickup coordinates with fallbacks
       let pickup = null;
@@ -432,20 +432,25 @@ export default function TripDetails({ params }) {
 
       // Get dropoff coordinates with fallbacks
       let dropoff = null;
-      if (trip?.destination?.coordinates) {
+      if (trip?.dropoff?.coordinates) {
+        dropoff = trip.dropoff.coordinates;
+      } else if (trip?.destination?.coordinates) {
         dropoff = trip.destination.coordinates;
-      } else if (trip?.dropLocation?.coordinates) {
-        dropoff = trip.dropLocation.coordinates;
       }
 
       console.log('Extracted coordinates:', { pickup, dropoff });
 
       // Validate coordinates
       const isValidCoordinate = (coord) => {
-        return Array.isArray(coord) && 
+        const isValid = Array.isArray(coord) && 
                coord.length === 2 && 
                !isNaN(parseFloat(coord[0])) && 
                !isNaN(parseFloat(coord[1]));
+        
+        if (!isValid) {
+          console.error('Invalid coordinate format:', coord);
+        }
+        return isValid;
       };
 
       if (!isValidCoordinate(pickup)) {
@@ -468,7 +473,7 @@ export default function TripDetails({ params }) {
         lng: parseFloat(dropoff[1])
       };
 
-      console.log('Formatted coordinates:', { startPoint, endPoint });
+      console.log('Formatted coordinates for route calculation:', { startPoint, endPoint });
 
       setFromCoords(pickup);
       setToCoords(dropoff);
@@ -478,7 +483,7 @@ export default function TripDetails({ params }) {
       const routeData = await calculateRoute(startPoint, endPoint);
 
       if (routeData) {
-        console.log('Route calculated successfully:', routeData);
+        console.log('Route calculation successful:', routeData);
         setRoutePoints(routeData.coordinates);
         setLiveStats(prev => ({
           ...prev,
@@ -487,11 +492,15 @@ export default function TripDetails({ params }) {
           fare: trip.estimatedFare || trip.fare || '0'
         }));
       } else {
-        console.error('Failed to calculate route');
+        console.error('Failed to calculate route between points');
       }
     } catch (error) {
       console.error('Error in updateTripCoordinates:', error);
-      setError('Could not load trip route');
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+      setError('Could not load trip route. Please check console for more information.');
     }
   };
 
@@ -557,30 +566,75 @@ export default function TripDetails({ params }) {
     const fetchTripDetails = async () => {
       try {
         setLoading(true);
+        console.log('Fetching trip details for rideId:', rideId);
+        
         const response = await axios.get(`/api/rides/${rideId}`);
+        console.log('Raw API Response:', response);
+        
         const tripData = response.data.data;
-        console.log('Received trip data:', tripData);
+        console.log('Raw Trip Data:', tripData);
 
         // Validate trip data
         if (!tripData) {
           throw new Error('No trip data received');
         }
 
-        setTrip(tripData);
+        // Validate required fields
+        if (!tripData.pickupLocation && !tripData.pickup) {
+          console.error('Missing pickup location data');
+        }
+        if (!tripData.dropLocation && !tripData.destination) {
+          console.error('Missing drop location data');
+        }
+
+        // Format locations if they exist
+        const formattedTripData = {
+          ...tripData,
+          pickup: {
+            ...tripData.pickup,
+            ...tripData.pickupLocation,
+            address: tripData.pickup?.address || tripData.pickupLocation?.address,
+            coordinates: tripData.pickup?.coordinates || tripData.pickupLocation?.coordinates,
+            landmark: tripData.pickup?.landmark || tripData.pickupLocation?.landmark
+          },
+          dropoff: {
+            ...tripData.destination,
+            ...tripData.dropLocation,
+            address: tripData.destination?.address || tripData.dropLocation?.address,
+            coordinates: tripData.destination?.coordinates || tripData.dropLocation?.coordinates,
+            landmark: tripData.destination?.landmark || tripData.dropLocation?.landmark
+          },
+          // Ensure other required fields are present
+          distance: tripData.distance || '0',
+          duration: tripData.duration || '0',
+          fare: tripData.estimatedFare || tripData.fare || '0',
+          status: tripData.status || 'unknown'
+        };
+
+        console.log('Formatted Trip Data:', formattedTripData);
+        console.log('Pickup Location:', formattedTripData.pickup);
+        console.log('Drop Location:', formattedTripData.dropoff);
+
+        setTrip(formattedTripData);
         
         // Initialize live stats with trip data
         setLiveStats({
-          distance: tripData.distance || '0',
-          duration: tripData.duration || '0',
-          fare: tripData.estimatedFare || tripData.fare || '0'
+          distance: formattedTripData.distance || '0',
+          duration: formattedTripData.duration || '0',
+          fare: formattedTripData.estimatedFare || formattedTripData.fare || '0'
         });
         
-        await updateTripCoordinates(tripData);
+        await updateTripCoordinates(formattedTripData);
         getCurrentLocation();
         await checkTransactionStatus();
       } catch (err) {
         console.error('Error fetching trip details:', err);
-        setError('Failed to load trip details');
+        console.error('Error details:', {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status
+        });
+        setError('Failed to load trip details. Please check console for more information.');
       } finally {
         setLoading(false);
       }
@@ -747,14 +801,34 @@ export default function TripDetails({ params }) {
               <FaMapMarkerAlt className="icon" size={20} />
               <div className="text">
                 <h4>Pickup Location</h4>
-                <p>{trip.pickup?.address || trip.pickupLocation?.address || 'Loading pickup location...'}</p>
+                <p>
+                  {trip.pickup?.address || 
+                   trip.pickup?.formatted_address || 
+                   trip.pickup?.name ||
+                   'Location not available'}
+                </p>
+                {trip.pickup?.landmark && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Landmark: {trip.pickup.landmark}
+                  </p>
+                )}
               </div>
             </div>
             <div className="location-item">
               <FaMapMarkerAlt className="icon" size={20} />
               <div className="text">
                 <h4>Drop Location</h4>
-                <p>{trip.destination?.address || trip.dropLocation?.address || 'Loading drop location...'}</p>
+                <p>
+                  {trip.dropoff?.address || 
+                   trip.dropoff?.formatted_address || 
+                   trip.dropoff?.name ||
+                   'Location not available'}
+                </p>
+                {trip.dropoff?.landmark && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Landmark: {trip.dropoff.landmark}
+                  </p>
+                )}
               </div>
             </div>
           </LocationInfo>
@@ -764,25 +838,14 @@ export default function TripDetails({ params }) {
           <Section>
             <h2>Payment</h2>
             <PaymentSection>
-              {transactionStatus === 'completed' ? (
-                <div className="bg-white p-6 rounded-xl border border-gray-200">
-                  {transactionStatus === 'rated' ? (
-                    <div className="text-center">
-                      <h3 className="text-xl font-semibold mb-2 text-green-600">Rating Submitted</h3>
-                      <div className="flex justify-center mb-2">
-                        {[...Array(rating)].map((_, index) => (
-                          <FaStar key={index} className="text-yellow-400 text-2xl" />
-                        ))}
-                      </div>
-                      {feedback && (
-                        <p className="text-gray-600 italic">"{feedback}"</p>
-                      )}
-                      <p className="text-gray-600 mt-4">Thank you for your feedback!</p>
-                    </div>
-                  ) : (
+              <div className="bg-white p-6 rounded-xl border border-gray-200">
+                <div className="text-center">
+                  <h3 className="text-xl font-semibold mb-2 text-green-600">Payment Completed</h3>
+                  <p className="text-gray-600 mb-4">Thank you for using our service!</p>
+                  
+                  {transactionStatus !== 'rated' ? (
                     <>
-                      <h3 className="text-xl font-semibold mb-4 text-green-600">Payment Completed</h3>
-                      <p className="text-gray-600 mb-4">Thank you for completing the payment. Please rate your driver.</p>
+                      <p className="text-gray-600 mb-4">Please rate your driver.</p>
                       <div className="flex items-center justify-center mb-4">
                         {[...Array(5)].map((_, index) => {
                           const ratingValue = index + 1;
@@ -819,28 +882,22 @@ export default function TripDetails({ params }) {
                         Submit Rating
                       </button>
                     </>
+                  ) : (
+                    <div className="text-center">
+                      <h3 className="text-xl font-semibold mb-2 text-green-600">Rating Submitted</h3>
+                      <div className="flex justify-center mb-2">
+                        {[...Array(rating)].map((_, index) => (
+                          <FaStar key={index} className="text-yellow-400 text-2xl" />
+                        ))}
+                      </div>
+                      {feedback && (
+                        <p className="text-gray-600 italic">"{feedback}"</p>
+                      )}
+                      <p className="text-gray-600 mt-4">Thank you for your feedback!</p>
+                    </div>
                   )}
                 </div>
-              ) : (
-                <>
-                  <h3>Complete Your Payment</h3>
-                  <p>Please complete the payment for your ride using MetaMask</p>
-                  <Web3Integration 
-                    ride={trip}
-                    onPaymentComplete={() => {
-                      toast.success('Payment completed successfully!');
-                      checkTransactionStatus();
-                      if (socket) {
-                        socket.emit('updateTripStatus', {
-                          rideId: trip.rideId,
-                          status: 'paid',
-                          tripDetails: trip
-                        });
-                      }
-                    }}
-                  />
-                </>
-              )}
+              </div>
             </PaymentSection>
           </Section>
         )}
