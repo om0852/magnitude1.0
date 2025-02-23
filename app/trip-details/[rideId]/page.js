@@ -391,6 +391,7 @@ export default function TripDetails({ params }) {
   const [feedback, setFeedback] = useState('');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('pending');
+  const [currentDuration, setCurrentDuration] = useState('0');
 
   // Function to calculate route between two points
   const calculateRoute = async (start, end) => {
@@ -487,6 +488,16 @@ export default function TripDetails({ params }) {
     }
   };
 
+  // Function to format duration
+  const formatDuration = (minutes) => {
+    if (minutes < 60) {
+      return `${minutes} mins`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  };
+
   // Update trip coordinates
   const updateTripCoordinates = async (trip) => {
     try {
@@ -570,9 +581,10 @@ export default function TripDetails({ params }) {
         setLiveStats(prev => ({
           ...prev,
           distance: trip.distance || routeData.distance || '0',
-          duration: trip.duration || routeData.duration || '0',
-          fare: trip.estimatedFare || trip.fare || '0'
+          duration: routeData.duration || '0'
         }));
+        // Update current duration with the calculated value
+        setCurrentDuration(formatDuration(routeData.duration));
       } else {
         console.error('Failed to calculate route between points');
       }
@@ -862,20 +874,20 @@ export default function TripDetails({ params }) {
 
         <Section>
           <h2>Live Trip Stats</h2>
-          <LiveStats>
-            <div className="stat">
-              <h4>Distance</h4>
-              <p>{trip?.distance || liveStats.distance} km</p>
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div>
+              <p className="font-medium text-purple-900 mb-1">Distance</p>
+              <p className="text-gray-700">{liveStats.distance} km</p>
             </div>
-            <div className="stat">
-              <h4>Duration</h4>
-              <p>{trip?.duration || liveStats.duration} mins</p>
+            <div>
+              <p className="font-medium text-purple-900 mb-1">Duration</p>
+              <p className="text-gray-700">{currentDuration}</p>
             </div>
-            <div className="stat">
-              <h4>Fare</h4>
-              <p>₹{trip?.estimatedFare || trip?.fare || liveStats.fare}</p>
+            <div>
+              <p className="font-medium text-purple-900 mb-1">Fare</p>
+              <p className="text-gray-700">₹{liveStats.fare}</p>
             </div>
-          </LiveStats>
+          </div>
 
           <MapWrapper>
             {showMap && (

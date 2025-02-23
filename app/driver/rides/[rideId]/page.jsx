@@ -26,6 +26,7 @@ const RideDetails = ({ params }) => {
   const [socket, setSocket] = useState(null);
   const [isVerified, setIsVerified] = useState(false);
   const [transactionStatus, setTransactionStatus] = useState(null);
+  const [currentDuration, setCurrentDuration] = useState('0');
   
   // Map related states
   const [userLocation, setUserLocation] = useState(null);
@@ -41,6 +42,49 @@ const RideDetails = ({ params }) => {
     duration: '0',
     fare: '0'
   });
+
+  // Add formatDuration function
+  const formatDuration = (minutes) => {
+    if (!minutes) return '0 mins';
+    if (minutes < 60) {
+      return `${minutes} mins`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return `${hours}h ${remainingMinutes}m`;
+  };
+
+  // Function to calculate duration
+  const calculateDuration = () => {
+    if (!ride?.startTime) return '0';
+    
+    const start = new Date(ride.startTime);
+    const end = ride.endTime ? new Date(ride.endTime) : new Date();
+    const durationInMinutes = Math.floor((end - start) / (1000 * 60));
+    
+    if (durationInMinutes < 60) {
+      return `${durationInMinutes} mins`;
+    } else {
+      const hours = Math.floor(durationInMinutes / 60);
+      const minutes = durationInMinutes % 60;
+      return `${hours}h ${minutes}m`;
+    }
+  };
+
+  // Update duration every minute for ongoing rides
+  useEffect(() => {
+    if (ride && ride.startTime && !ride.endTime) {
+      const interval = setInterval(() => {
+        setCurrentDuration(calculateDuration());
+      }, 60000); // Update every minute
+
+      setCurrentDuration(calculateDuration()); // Initial calculation
+      
+      return () => clearInterval(interval);
+    } else if (ride?.startTime && ride?.endTime) {
+      setCurrentDuration(calculateDuration()); // Set final duration for completed rides
+    }
+  }, [ride]);
 
   // Add function to check transaction status
   const checkTransactionStatus = async () => {
@@ -110,6 +154,7 @@ const RideDetails = ({ params }) => {
                   distance: routeData.distance,
                   duration: routeData.duration
                 }));
+                setCurrentDuration(formatDuration(routeData.duration));
               }
             });
         }
@@ -315,9 +360,10 @@ const RideDetails = ({ params }) => {
         setLiveStats(prev => ({
           ...prev,
           distance: trip.distance || routeData.distance || '0',
-          duration: trip.duration || routeData.duration || '0',
-          fare: trip.estimatedFare || trip.fare || '0'
+          duration: routeData.duration || '0'
         }));
+        // Update current duration with the calculated value
+        setCurrentDuration(formatDuration(routeData.duration));
       } else {
         console.error('Failed to calculate route between points');
       }
@@ -495,7 +541,7 @@ const RideDetails = ({ params }) => {
                       </div>
                       <div>
                         <p className="font-medium text-purple-900 mb-1">Duration</p>
-                        <p className="text-gray-700">{ride.duration}</p>
+                        <p className="text-gray-700">{currentDuration}</p>
                       </div>
                       <div>
                         <p className="font-medium text-purple-900 mb-1">Fare</p>
@@ -553,14 +599,14 @@ const RideDetails = ({ params }) => {
                       <p className="font-medium text-purple-900 mb-1">Distance</p>
                       <p className="text-gray-700">{liveStats.distance} km</p>
                     </div>
-                    <div>
+                    {/* <div>
                       <p className="font-medium text-purple-900 mb-1">Duration</p>
-                      <p className="text-gray-700">{liveStats.duration} mins</p>
+                      <p className="text-gray-700">{currentDuration}</p>
                     </div>
                     <div>
                       <p className="font-medium text-purple-900 mb-1">Fare</p>
                       <p className="text-gray-700">₹{liveStats.fare}</p>
-                    </div>
+                    </div> */}
                   </div>
                   <div className="h-[400px] relative rounded-xl overflow-hidden">
                     {showMap && (
