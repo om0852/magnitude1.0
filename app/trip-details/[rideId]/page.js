@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
-import { FaCar, FaUser, FaPhone, FaMapMarkerAlt, FaClock, FaMoneyBillWave, FaRoute } from 'react-icons/fa';
+import { FaCar, FaUser, FaPhone, FaMapMarkerAlt, FaClock, FaMoneyBillWave, FaRoute, FaStar } from 'react-icons/fa';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import io from 'socket.io-client';
@@ -318,6 +318,10 @@ export default function TripDetails({ params }) {
   const [socket, setSocket] = useState(null);
   const [lastUpdateTime, setLastUpdateTime] = useState(null);
   const mapRef = useRef(null);
+  const [transactionStatus, setTransactionStatus] = useState(null);
+  const [rating, setRating] = useState(0);
+  const [hover, setHover] = useState(null);
+  const [feedback, setFeedback] = useState('');
 
   // Function to calculate route between two points
   const calculateRoute = async (start, end) => {
@@ -479,6 +483,18 @@ export default function TripDetails({ params }) {
     };
   }, [rideId, toCoords]);
 
+  // Add this function to check transaction status
+  const checkTransactionStatus = async () => {
+    try {
+      const response = await axios.get(`/api/transactions/${rideId}`);
+      if (response.data.success && response.data.data) {
+        setTransactionStatus(response.data.data.status);
+      }
+    } catch (error) {
+      console.error('Error checking transaction status:', error);
+    }
+  };
+
   // Fetch trip details
   useEffect(() => {
     const fetchTripDetails = async () => {
@@ -486,9 +502,10 @@ export default function TripDetails({ params }) {
         setLoading(true);
         const response = await axios.get(`/api/rides/${rideId}`);
         setTrip(response.data.data);
-        console.log(response.data.data)
-        await updateTripCoordinates(response.data.data); // Update coordinates after fetching trip details
-        getCurrentLocation(); // Get user location after fetching trip details
+        console.log(response.data.data);
+        await updateTripCoordinates(response.data.data);
+        getCurrentLocation();
+        await checkTransactionStatus(); // Check transaction status
       } catch (err) {
         setError('Failed to load trip details');
       } finally {
@@ -509,6 +526,31 @@ export default function TripDetails({ params }) {
 
     return () => clearInterval(locationInterval);
   }, [trip]);
+
+  // Add submitRating function
+  const submitRating = async () => {
+    try {
+      const response = await axios.post(`/api/rides/${rideId}/rate`, {
+        rating,
+        feedback
+      });
+
+      if (response.data.success) {
+        toast.success('Thank you for your rating!');
+        // Update trip data to reflect the new rating
+        setTrip(prev => ({
+          ...prev,
+          rating,
+          feedback
+        }));
+        // Hide the rating UI
+        setTransactionStatus('rated');
+      }
+    } catch (error) {
+      console.error('Error submitting rating:', error);
+      toast.error(error.response?.data?.error || 'Failed to submit rating. Please try again.');
+    }
+  };
 
   if (loading) {
     return (
@@ -661,22 +703,83 @@ export default function TripDetails({ params }) {
           <Section>
             <h2>Payment</h2>
             <PaymentSection>
-              <h3>Complete Your Payment</h3>
-              <p>Please complete the payment for your ride using MetaMask</p>
-              <Web3Integration 
-                ride={trip}
-                onPaymentComplete={() => {
-                  toast.success('Payment completed successfully!');
-                  // Update trip status to paid
-                  if (socket) {
-                    socket.emit('updateTripStatus', {
-                      rideId: trip.rideId,
-                      status: 'paid',
-                      tripDetails: trip
-                    });
-                  }
-                }}
-              />
+              {transactionStatus === 'completed' ? (
+                <div className="bg-white p-6 rounded-xl border border-gray-200">
+                  {transactionStatus === 'rated' ? (
+                    <div className="text-center">
+                      <h3 className="text-xl font-semibold mb-2 text-green-600">Rating Submitted</h3>
+                      <div className="flex justify-center mb-2">
+                        {[...Array(rating)].map((_, index) => (
+                          <FaStar key={index} className="text-yellow-400 text-2xl" />
+                        ))}
+                      </div>
+                      {feedback && (
+                        <p className="text-gray-600 italic">"{feedback}"</p>
+                      )}
+                      <p className="text-gray-600 mt-4">Thank you for your feedback!</p>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="text-xl font-semibold mb-4 text-green-600">Payment Completed</h3>
+                      <p className="text-gray-600 mb-4">Thank you for completing the payment. Please rate your driver.</p>
+                      <div className="flex items-center justify-center mb-4">
+                        {[...Array(5)].map((_, index) => {
+                          const ratingValue = index + 1;
+                          return (
+                            <button
+                              type="button"
+                              key={ratingValue}
+                              className={`text-3xl mr-2 focus:outline-none transition-colors duration-200 ${
+                                (hover || rating) >= ratingValue
+                                  ? 'text-yellow-400'
+                                  : 'text-gray-300'
+                              }`}
+                              onClick={() => setRating(ratingValue)}
+                              onMouseEnter={() => setHover(ratingValue)}
+                              onMouseLeave={() => setHover(null)}
+                            >
+                              <FaStar />
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <textarea
+                        className="w-full p-3 border border-gray-300 rounded-lg mb-4"
+                        placeholder="Share your experience with the driver (optional)"
+                        value={feedback}
+                        onChange={(e) => setFeedback(e.target.value)}
+                        rows="3"
+                      />
+                      <button
+                        onClick={submitRating}
+                        disabled={!rating}
+                        className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                      >
+                        Submit Rating
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <h3>Complete Your Payment</h3>
+                  <p>Please complete the payment for your ride using MetaMask</p>
+                  <Web3Integration 
+                    ride={trip}
+                    onPaymentComplete={() => {
+                      toast.success('Payment completed successfully!');
+                      checkTransactionStatus();
+                      if (socket) {
+                        socket.emit('updateTripStatus', {
+                          rideId: trip.rideId,
+                          status: 'paid',
+                          tripDetails: trip
+                        });
+                      }
+                    }}
+                  />
+                </>
+              )}
             </PaymentSection>
           </Section>
         )}

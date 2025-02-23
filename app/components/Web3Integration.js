@@ -4,12 +4,17 @@ import { useState, useEffect } from 'react';
 import Web3 from 'web3';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import { FaStar } from 'react-icons/fa';
 
 export const Web3Integration = ({ ride, onPaymentComplete }) => {
     const [web3, setWeb3] = useState(null);
     const [account, setAccount] = useState(null);
     const [loading, setLoading] = useState(false);
     const [transactionStatus, setTransactionStatus] = useState(null);
+    const [showRating, setShowRating] = useState(false);
+    const [rating, setRating] = useState(0);
+    const [feedback, setFeedback] = useState('');
+    const [hover, setHover] = useState(null);
 
     useEffect(() => {
         initializeWeb3();
@@ -91,6 +96,40 @@ export const Web3Integration = ({ ride, onPaymentComplete }) => {
         }
     };
 
+    const submitRating = async () => {
+        try {
+            const response = await axios.post(`/api/rides/${ride.rideId}/rate`, {
+                rating,
+                feedback
+            });
+
+            if (response.data.success) {
+                toast.success('Thank you for your feedback! Redirecting...', {
+                    duration: 3000,
+                });
+                
+                // Check user role from session
+                const userResponse = await axios.get('/api/auth/me');
+                const userRole = userResponse.data.role;
+                
+                // Wait for toast to be visible before redirecting
+                setTimeout(() => {
+                    // Redirect based on user role
+                    if (userRole === 'driver') {
+                        window.location.href = '/driver/dashboard';
+                    } else {
+                        window.location.href = '/';
+                    }
+                }, 2000);
+                
+                setShowRating(false);
+            }
+        } catch (error) {
+            console.error('Error submitting rating:', error);
+            toast.error('Failed to submit rating. Please try again.');
+        }
+    };
+
     const makePayment = async () => {
         try {
             setLoading(true);
@@ -162,6 +201,8 @@ export const Web3Integration = ({ ride, onPaymentComplete }) => {
                 icon: '💰',
             });
 
+            setShowRating(true); // Show rating UI after payment
+
             if (onPaymentComplete) {
                 onPaymentComplete();
             }
@@ -198,13 +239,56 @@ export const Web3Integration = ({ ride, onPaymentComplete }) => {
     // Don't show payment section if transaction is already completed
     if (transactionStatus === 'completed') {
         return (
-            <div className="bg-green-50 p-6 rounded-xl border border-green-100">
-                <h3 className="text-xl font-semibold mb-2 text-green-900">
-                    Payment Completed
-                </h3>
-                <p className="text-green-700">
-                    The payment for this ride has been successfully processed.
-                </p>
+            <div className="space-y-4">
+                <div className="bg-green-50 p-6 rounded-xl border border-green-100">
+                    <h3 className="text-xl font-semibold mb-2 text-green-900">
+                        Payment Completed
+                    </h3>
+                    <p className="text-green-700">
+                        The payment for this ride has been successfully processed.
+                    </p>
+                </div>
+
+                {showRating && (
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 mt-4">
+                        <h3 className="text-xl font-semibold mb-4">Rate Your Driver</h3>
+                        <div className="flex items-center mb-4">
+                            {[...Array(5)].map((_, index) => {
+                                const ratingValue = index + 1;
+                                return (
+                                    <button
+                                        type="button"
+                                        key={ratingValue}
+                                        className={`text-2xl mr-2 focus:outline-none transition-colors duration-200 ${
+                                            (hover || rating) >= ratingValue
+                                                ? 'text-yellow-400'
+                                                : 'text-gray-300'
+                                        }`}
+                                        onClick={() => setRating(ratingValue)}
+                                        onMouseEnter={() => setHover(ratingValue)}
+                                        onMouseLeave={() => setHover(null)}
+                                    >
+                                        <FaStar />
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <textarea
+                            className="w-full p-3 border border-gray-300 rounded-lg mb-4"
+                            placeholder="Share your experience (optional)"
+                            value={feedback}
+                            onChange={(e) => setFeedback(e.target.value)}
+                            rows="3"
+                        />
+                        <button
+                            onClick={submitRating}
+                            disabled={!rating}
+                            className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                        >
+                            Submit Rating
+                        </button>
+                    </div>
+                )}
             </div>
         );
     }
