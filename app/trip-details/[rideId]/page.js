@@ -364,6 +364,111 @@ const PaymentSection = styled.div`
   }
 `;
 
+// Add new styled component for SOS button
+const SOSButton = styled.button`
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #DC2626;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1.2rem;
+  border: none;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  cursor: pointer;
+  z-index: 50;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: scale(1.1);
+    background: #B91C1C;
+    box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+const SOSModal = styled.div`
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  padding: 2rem;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  width: 90%;
+  max-width: 500px;
+
+  h3 {
+    color: #DC2626;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+  }
+
+  .emergency-options {
+    display: grid;
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  .emergency-button {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background: #FEE2E2;
+    color: #DC2626;
+    border: 1px solid #FECACA;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #FEE2E2;
+      transform: translateY(-2px);
+    }
+  }
+
+  .close-button {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    color: #6B7280;
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: #F3F4F6;
+      color: #374151;
+    }
+  }
+`;
+
+const Overlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+`;
+
 export default function TripDetails({ params }) {
   const unwrappedParams = use(params);
   const { rideId } = unwrappedParams;
@@ -392,6 +497,7 @@ export default function TripDetails({ params }) {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('pending');
   const [currentDuration, setCurrentDuration] = useState('0');
+  const [showSOSModal, setShowSOSModal] = useState(false);
 
   // Function to calculate route between two points
   const calculateRoute = async (start, end) => {
@@ -819,6 +925,36 @@ export default function TripDetails({ params }) {
     }
   };
 
+  // Add handleEmergency function
+  const handleEmergency = async (type) => {
+    try {
+      // Send emergency alert to backend
+      await axios.post('/api/emergency/alert', {
+        rideId,
+        type,
+        location: userLocation,
+        userId: trip.userId,
+        driverId: trip.driverId
+      });
+
+      // Show success message
+      toast.success('Emergency services have been notified');
+
+      // Close modal
+      setShowSOSModal(false);
+
+      // If it's police or ambulance, attempt to call emergency services
+      if (type === 'police') {
+        window.location.href = 'tel:100';
+      } else if (type === 'ambulance') {
+        window.location.href = 'tel:102';
+      }
+    } catch (error) {
+      console.error('Error sending emergency alert:', error);
+      toast.error('Failed to send emergency alert. Please try calling emergency services directly.');
+    }
+  };
+
   if (loading) {
     return (
       <PageContainer>
@@ -1079,6 +1215,56 @@ export default function TripDetails({ params }) {
           </Section>
         )}
       </TripCard>
+
+      {/* SOS Button */}
+      <SOSButton onClick={() => setShowSOSModal(true)}>
+        SOS
+      </SOSButton>
+
+      {/* SOS Modal */}
+      {showSOSModal && (
+        <>
+          <Overlay onClick={() => setShowSOSModal(false)} />
+          <SOSModal>
+            <button 
+              className="close-button"
+              onClick={() => setShowSOSModal(false)}
+            >
+              ✕
+            </button>
+            <h3>Emergency Assistance</h3>
+            <p className="text-gray-600">
+              Select the type of emergency assistance you need:
+            </p>
+            <div className="emergency-options">
+              <button 
+                className="emergency-button"
+                onClick={() => handleEmergency('police')}
+              >
+                <span>🚓</span>
+                Police - 100
+              </button>
+              <button 
+                className="emergency-button"
+                onClick={() => handleEmergency('ambulance')}
+              >
+                <span>🚑</span>
+                Ambulance - 102
+              </button>
+              <button 
+                className="emergency-button"
+                onClick={() => handleEmergency('support')}
+              >
+                <span>👥</span>
+                Contact Support
+              </button>
+            </div>
+            <p className="text-sm text-gray-500">
+              Your current location will be shared with emergency services.
+            </p>
+          </SOSModal>
+        </>
+      )}
     </PageContainer>
   );
 } 
