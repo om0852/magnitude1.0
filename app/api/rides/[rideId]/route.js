@@ -43,11 +43,15 @@ export async function GET(request, { params }) {
       driverDetails,
       pickupLocation: {
         address: ride.pickup?.address || 'Unknown pickup location',
-        coordinates: ride.pickup?.coordinates
+        coordinates: ride.pickup?.coordinates,
+        lat: ride.pickup?.lat,
+        lng: ride.pickup?.lng
       },
       dropLocation: {
         address: ride.destination?.address || 'Unknown destination',
-        coordinates: ride.destination?.coordinates
+        coordinates: ride.destination?.coordinates,
+        lat: ride.destination?.lat,
+        lng: ride.destination?.lng
       },
       distance: ride.distance || '0',
       duration: ride.duration || '0 mins',

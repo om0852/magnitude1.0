@@ -1,10 +1,21 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, use, useRef } from 'react';
 import axios from 'axios';
 import io from 'socket.io-client';
 import toast from 'react-hot-toast';
 import { Web3Integration } from '../../../components/Web3Integration';
+import dynamic from 'next/dynamic';
+
+// Dynamically import the Map component with no SSR
+const TripMap = dynamic(() => import('../../../components/TripMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[400px] w-full bg-gray-100 rounded-lg flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
+    </div>
+  )
+});
 
 const RideDetails = ({ params }) => {
   const { rideId } = use(params);
@@ -14,6 +25,21 @@ const RideDetails = ({ params }) => {
   const [loading, setLoading] = useState(true);
   const [socket, setSocket] = useState(null);
   const [isVerified, setIsVerified] = useState(false);
+  
+  // Map related states
+  const [userLocation, setUserLocation] = useState(null);
+  const [routePoints, setRoutePoints] = useState([]);
+  const [fromCoords, setFromCoords] = useState(null);
+  const [toCoords, setToCoords] = useState(null);
+  const [showMap, setShowMap] = useState(false);
+  const [driverLocation, setDriverLocation] = useState(null);
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+  const mapRef = useRef(null);
+  const [liveStats, setLiveStats] = useState({
+    distance: '0',
+    duration: '0',
+    fare: '0'
+  });
 
   useEffect(() => {
     console.log('RideId from params:', rideId);
@@ -38,18 +64,40 @@ const RideDetails = ({ params }) => {
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        const driverLocation = {
+        const location = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
-          rideId: rideId,
           timestamp: new Date().toISOString()
         };
+        
+        setDriverLocation(location);
+        setLastUpdateTime(new Date().toISOString());
 
         // Emit driver location update
-        socket.emit('driverLocationUpdate', driverLocation);
+        socket.emit('driverLocationUpdate', {
+          ...location,
+          rideId: rideId
+        });
+        
+        // If we have destination coordinates, update route
+        if (toCoords) {
+          const destination = { lat: parseFloat(toCoords[0]), lng: parseFloat(toCoords[1]) };
+          calculateRoute(location, destination)
+            .then(routeData => {
+              if (routeData) {
+                setRoutePoints(routeData.coordinates);
+                setLiveStats(prev => ({
+                  ...prev,
+                  distance: routeData.distance,
+                  duration: routeData.duration
+                }));
+              }
+            });
+        }
       },
       (error) => {
         console.error('Error getting location:', error);
+        toast.error('Unable to get your location. Please enable location services.');
       },
       {
         enableHighAccuracy: true,
@@ -58,11 +106,17 @@ const RideDetails = ({ params }) => {
       }
     );
 
-    // Cleanup
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [socket, rideId]);
+  }, [socket, rideId, toCoords]);
+
+  // Update coordinates when ride data is fetched
+  useEffect(() => {
+    if (ride) {
+      updateTripCoordinates(ride);
+    }
+  }, [ride]);
 
   const fetchRideDetails = async () => {
     try {
@@ -118,6 +172,143 @@ const RideDetails = ({ params }) => {
     } catch (err) {
       toast.error('Failed to complete ride');
       console.error('Error completing ride:', err);
+    }
+  };
+
+  // Function to calculate route between two points
+  const calculateRoute = async (start, end) => {
+    try {
+      // Ensure coordinates are in the correct format (lng,lat)
+      console.log('Calculating route with coordinates:', start, end);
+      
+      // Swap lat/lng if needed to match OSRM's expected format
+      const startCoord = `${start.lng},${start.lat}`;
+      const endCoord = `${end.lng},${end.lat}`;
+      
+      const url = `https://router.project-osrm.org/route/v1/driving/${startCoord};${endCoord}?overview=full&geometries=geojson`;
+      console.log('OSRM URL:', url);
+
+      const response = await fetch(url);
+      const data = await response.json();
+      console.log('OSRM Response:', data);
+
+      if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+        throw new Error('No route found');
+      }
+
+      const route = data.routes[0];
+      const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+      const distance = (route.distance / 1000).toFixed(1); // Convert to km
+      const duration = Math.round(route.duration / 60); // Convert to minutes
+
+      console.log('Calculated route:', { distance, duration, coordinates: coordinates.length });
+      return {
+        coordinates,
+        distance,
+        duration
+      };
+    } catch (error) {
+      console.error('Error calculating route:', error);
+      return null;
+    }
+  };
+
+  // Update trip coordinates
+  const updateTripCoordinates = async (trip) => {
+    try {
+      console.log('Updating coordinates for trip:', trip);
+
+      // Get pickup coordinates with fallbacks
+      let pickup = null;
+      if (trip?.pickup?.lat && trip?.pickup?.lng) {
+        pickup = [trip.pickup.lat, trip.pickup.lng];
+      } else if (trip?.pickup?.coordinates) {
+        pickup = trip.pickup.coordinates;
+      } else if (trip?.pickupLocation?.lat && trip?.pickupLocation?.lng) {
+        pickup = [trip.pickupLocation.lat, trip.pickupLocation.lng];
+      } else if (trip?.pickupLocation?.coordinates) {
+        pickup = trip.pickupLocation.coordinates;
+      }
+
+      // Get dropoff coordinates with fallbacks
+      let dropoff = null;
+      if (trip?.dropoff?.lat && trip?.dropoff?.lng) {
+        dropoff = [trip.dropoff.lat, trip.dropoff.lng];
+      } else if (trip?.dropoff?.coordinates) {
+        dropoff = trip.dropoff.coordinates;
+      } else if (trip?.destination?.lat && trip?.destination?.lng) {
+        dropoff = [trip.destination.lat, trip.destination.lng];
+      } else if (trip?.destination?.coordinates) {
+        dropoff = trip.destination.coordinates;
+      }
+
+      console.log('Extracted coordinates:', { pickup, dropoff });
+
+      // Validate coordinates
+      const isValidCoordinate = (coord) => {
+        const isValid = Array.isArray(coord) && 
+               coord.length === 2 && 
+               !isNaN(parseFloat(coord[0])) && 
+               !isNaN(parseFloat(coord[1])) &&
+               parseFloat(coord[0]) >= -90 && 
+               parseFloat(coord[0]) <= 90 && 
+               parseFloat(coord[1]) >= -180 && 
+               parseFloat(coord[1]) <= 180;
+        
+        if (!isValid) {
+          console.error('Invalid coordinate format:', coord);
+        }
+        return isValid;
+      };
+
+      if (!isValidCoordinate(pickup)) {
+        console.error('Invalid pickup coordinates:', pickup);
+        return;
+      }
+
+      if (!isValidCoordinate(dropoff)) {
+        console.error('Invalid dropoff coordinates:', dropoff);
+        return;
+      }
+
+      // Ensure coordinates are in the correct format
+      const startPoint = { 
+        lat: parseFloat(pickup[0]), 
+        lng: parseFloat(pickup[1])
+      };
+      const endPoint = { 
+        lat: parseFloat(dropoff[0]), 
+        lng: parseFloat(dropoff[1])
+      };
+
+      console.log('Formatted coordinates for route calculation:', { startPoint, endPoint });
+
+      setFromCoords(pickup);
+      setToCoords(dropoff);
+      setShowMap(true);
+
+      // Calculate route between pickup and dropoff
+      const routeData = await calculateRoute(startPoint, endPoint);
+
+      if (routeData) {
+        console.log('Route calculation successful:', routeData);
+        setRoutePoints(routeData.coordinates);
+        setLiveStats(prev => ({
+          ...prev,
+          distance: trip.distance || routeData.distance || '0',
+          duration: trip.duration || routeData.duration || '0',
+          fare: trip.estimatedFare || trip.fare || '0'
+        }));
+      } else {
+        console.error('Failed to calculate route between points');
+      }
+    } catch (error) {
+      console.error('Error in updateTripCoordinates:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+      setError('Could not load trip route. Please check console for more information.');
     }
   };
 
@@ -297,6 +488,73 @@ const RideDetails = ({ params }) => {
                   fetchRideDetails();
                 }}
               />
+            </div>
+
+            {/* Live Map Section */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold mb-4 text-purple-900">Live Trip Tracking</h2>
+              <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
+                <div className="mb-6">
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <p className="font-medium text-purple-900 mb-1">Distance</p>
+                      <p className="text-gray-700">{liveStats.distance} km</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-purple-900 mb-1">Duration</p>
+                      <p className="text-gray-700">{liveStats.duration} mins</p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-purple-900 mb-1">Fare</p>
+                      <p className="text-gray-700">₹{liveStats.fare}</p>
+                    </div>
+                  </div>
+                  <div className="h-[400px] relative rounded-xl overflow-hidden">
+                    {showMap && (
+                      <>
+                        <TripMap
+                          driverLocation={driverLocation}
+                          userLocation={userLocation}
+                          fromCoords={fromCoords}
+                          toCoords={toCoords}
+                          routePoints={routePoints}
+                          trip={ride}
+                        />
+                        <div className="absolute bottom-4 right-4 bg-white p-3 rounded-lg shadow-md z-[1000]">
+                          <div className="space-y-2 text-sm text-gray-800">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-violet-600"></div>
+                              <span>Pickup Point</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-red-600"></div>
+                              <span>Drop Point</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-green-600"></div>
+                              <span>Your Location</span>
+                            </div>
+                          </div>
+                        </div>
+                        {driverLocation && (
+                          <div className="absolute top-4 left-4 bg-white p-3 rounded-lg shadow-md z-[1000]">
+                            <div className="text-sm text-gray-800">
+                              <div className="font-medium mb-1">Current Location</div>
+                              <div>Lat: {driverLocation.lat.toFixed(6)}</div>
+                              <div>Lng: {driverLocation.lng.toFixed(6)}</div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {lastUpdateTime && (
+                    <p className="text-sm text-gray-500 mt-2">
+                      Last updated: {new Date(lastUpdateTime).toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Timestamps */}

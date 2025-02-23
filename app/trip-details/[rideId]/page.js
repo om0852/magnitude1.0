@@ -250,6 +250,40 @@ const MapWrapper = styled.div`
   overflow: hidden;
   margin-top: 1rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  position: relative;
+
+  .map-legend {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #4b5563;
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+
+      .pickup { background: #6D28D9; }
+      .dropoff { background: #DC2626; }
+      .user { background: #2563EB; }
+      .driver { background: #059669; }
+    }
+  }
 `;
 
 const LiveStats = styled.div`
@@ -399,7 +433,7 @@ export default function TripDetails({ params }) {
   // Function to get user's current location
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
+      navigator.geolocation.watchPosition(
         (position) => {
           const location = {
             lat: position.coords.latitude,
@@ -408,17 +442,16 @@ export default function TripDetails({ params }) {
           console.log('User location:', location);
           setUserLocation(location);
           
-          if (trip?.dropLocation?.coordinates) {
-            const destination = {
-              lat: parseFloat(trip.dropLocation.coordinates[0]),
-              lng: parseFloat(trip.dropLocation.coordinates[1])
-            };
-            console.log('Destination:', destination);
-            calculateRoute(location, destination);
+          // If we have driver location and destination, update route
+          if (driverLocation && toCoords) {
+            const destination = { lat: parseFloat(toCoords[0]), lng: parseFloat(toCoords[1]) };
+            console.log('Calculating route to destination:', destination);
+            calculateRoute(driverLocation, destination);
           }
         },
         (error) => {
           console.error('Error getting location:', error);
+          toast.error('Unable to get your location. Please enable location services.');
         },
         {
           enableHighAccuracy: true,
@@ -426,6 +459,8 @@ export default function TripDetails({ params }) {
           maximumAge: 0
         }
       );
+    } else {
+      toast.error('Geolocation is not supported by your browser');
     }
   };
 
@@ -459,16 +494,24 @@ export default function TripDetails({ params }) {
 
       // Get pickup coordinates with fallbacks
       let pickup = null;
-      if (trip?.pickup?.coordinates) {
+      if (trip?.pickup?.lat && trip?.pickup?.lng) {
+        pickup = [trip.pickup.lat, trip.pickup.lng];
+      } else if (trip?.pickup?.coordinates) {
         pickup = trip.pickup.coordinates;
+      } else if (trip?.pickupLocation?.lat && trip?.pickupLocation?.lng) {
+        pickup = [trip.pickupLocation.lat, trip.pickupLocation.lng];
       } else if (trip?.pickupLocation?.coordinates) {
         pickup = trip.pickupLocation.coordinates;
       }
 
       // Get dropoff coordinates with fallbacks
       let dropoff = null;
-      if (trip?.dropoff?.coordinates) {
+      if (trip?.dropoff?.lat && trip?.dropoff?.lng) {
+        dropoff = [trip.dropoff.lat, trip.dropoff.lng];
+      } else if (trip?.dropoff?.coordinates) {
         dropoff = trip.dropoff.coordinates;
+      } else if (trip?.destination?.lat && trip?.destination?.lng) {
+        dropoff = [trip.destination.lat, trip.destination.lng];
       } else if (trip?.destination?.coordinates) {
         dropoff = trip.destination.coordinates;
       }
@@ -480,7 +523,11 @@ export default function TripDetails({ params }) {
         const isValid = Array.isArray(coord) && 
                coord.length === 2 && 
                !isNaN(parseFloat(coord[0])) && 
-               !isNaN(parseFloat(coord[1]));
+               !isNaN(parseFloat(coord[1])) &&
+               parseFloat(coord[0]) >= -90 && 
+               parseFloat(coord[0]) <= 90 && 
+               parseFloat(coord[1]) >= -180 && 
+               parseFloat(coord[1]) <= 180;
         
         if (!isValid) {
           console.error('Invalid coordinate format:', coord);
@@ -832,13 +879,38 @@ export default function TripDetails({ params }) {
 
           <MapWrapper>
             {showMap && (
-              <TripMap
-                driverLocation={driverLocation}
-                fromCoords={fromCoords}
-                toCoords={toCoords}
-                routePoints={routePoints}
-                trip={trip}
-              />
+              <>
+                <TripMap
+                  driverLocation={driverLocation}
+                  userLocation={userLocation}
+                  fromCoords={fromCoords}
+                  toCoords={toCoords}
+                  routePoints={routePoints}
+                  trip={trip}
+                />
+                <div className="map-legend">
+                  <div className="legend-item">
+                    <div className="dot pickup"></div>
+                    <span>Pickup Point</span>
+                  </div>
+                  <div className="legend-item">
+                    <div className="dot dropoff"></div>
+                    <span>Drop Point</span>
+                  </div>
+                  {userLocation && (
+                    <div className="legend-item">
+                      <div className="dot user"></div>
+                      <span>Your Location</span>
+                    </div>
+                  )}
+                  {driverLocation && (
+                    <div className="legend-item">
+                      <div className="dot driver"></div>
+                      <span>Driver Location</span>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </MapWrapper>
         </Section>
@@ -921,7 +993,7 @@ export default function TripDetails({ params }) {
             <PaymentSection>
               <div className="bg-white p-6 rounded-xl border border-gray-200">
                 <div className="text-center">
-                  {paymentStatus === 'completed' ? (
+                  {transactionStatus === 'completed' || paymentStatus === 'completed' ? (
                     <>
                       <h3 className="text-xl font-semibold mb-2 text-green-600">Payment Completed</h3>
                       <p className="text-gray-600 mb-4">Thank you for using our service!</p>

@@ -12,7 +12,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { rideId } = params;
+    const { rideId } = await params;
     const { db } = await connectToDatabase();
 
     // Find the transaction for this ride

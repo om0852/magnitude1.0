@@ -15,20 +15,21 @@ function MapUpdater({ center, zoom }) {
 }
 
 // Custom marker icons
-const createCustomIcon = (iconUrl) => new L.Icon({
+const createCustomIcon = (iconUrl, size = [25, 41]) => new L.Icon({
   iconUrl,
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-  iconSize: [25, 41],
+  iconSize: size,
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
   shadowSize: [41, 41]
 });
 
-const pickupIcon = createCustomIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png');
+const pickupIcon = createCustomIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png');
 const dropIcon = createCustomIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png');
-const carIcon = createCustomIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png');
+const userIcon = createCustomIcon('https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png');
+const driverIcon = createCustomIcon('/car-marker.png', [32, 32]); // Custom car icon for driver
 
-export default function TripMap({ driverLocation, fromCoords, toCoords, routePoints, trip }) {
+export default function TripMap({ driverLocation, userLocation, fromCoords, toCoords, routePoints, trip }) {
   const defaultCenter = [20.5937, 78.9629]; // Default to India's center
   const mapCenter = driverLocation 
     ? [driverLocation.lat, driverLocation.lng] 
@@ -49,11 +50,25 @@ export default function TripMap({ driverLocation, fromCoords, toCoords, routePoi
       {driverLocation && (
         <Marker 
           position={[driverLocation.lat, driverLocation.lng]}
-          icon={carIcon}
+          icon={driverIcon}
         >
           <Popup>
-            Driver's Location<br />
-            Last updated: {new Date(driverLocation.timestamp).toLocaleTimeString()}
+            <div className="font-semibold">Driver's Location</div>
+            <div className="text-sm text-gray-600">
+              Last updated: {new Date(driverLocation.timestamp).toLocaleTimeString()}
+            </div>
+          </Popup>
+        </Marker>
+      )}
+
+      {/* User Location Marker */}
+      {userLocation && (
+        <Marker 
+          position={[userLocation.lat, userLocation.lng]}
+          icon={userIcon}
+        >
+          <Popup>
+            <div className="font-semibold">Your Location</div>
           </Popup>
         </Marker>
       )}
@@ -64,7 +79,10 @@ export default function TripMap({ driverLocation, fromCoords, toCoords, routePoi
           position={fromCoords}
           icon={pickupIcon}
         >
-          <Popup>Pickup: {trip?.pickupLocation?.address}</Popup>
+          <Popup>
+            <div className="font-semibold">Pickup Location</div>
+            <div className="text-sm text-gray-600">{trip?.pickup?.address}</div>
+          </Popup>
         </Marker>
       )}
 
@@ -74,12 +92,15 @@ export default function TripMap({ driverLocation, fromCoords, toCoords, routePoi
           position={toCoords}
           icon={dropIcon}
         >
-          <Popup>Drop: {trip?.dropLocation?.address}</Popup>
+          <Popup>
+            <div className="font-semibold">Drop Location</div>
+            <div className="text-sm text-gray-600">{trip?.dropoff?.address}</div>
+          </Popup>
         </Marker>
       )}
 
       {/* Route Line */}
-      {routePoints.length > 0 && (
+      {routePoints && routePoints.length > 0 && (
         <Polyline
           positions={routePoints}
           pathOptions={{
