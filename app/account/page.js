@@ -73,15 +73,15 @@ export default function AccountPage() {
       setError(null);
       const response = await axios.get('/api/user/profile');
       if (response.data) {
-        setUserData(prev => ({
-          ...prev,
+      setUserData(prev => ({
+        ...prev,
           ...response.data,
-          // Format the date
+        // Format the date
           joinDate: new Date(response.data.joinDate).toLocaleDateString('en-US', { 
             month: 'long', 
             year: 'numeric' 
           })
-        }));
+      }));
         setSavedAddresses(response.data.savedAddresses || []);
       }
     } catch (error) {
@@ -112,7 +112,7 @@ export default function AccountPage() {
         formData.append('image', file);
         
         const response = await axios.post('/api/user/upload-image', formData, {
-          headers: {
+        headers: {
             'Content-Type': 'multipart/form-data',
           },
         });
@@ -136,7 +136,7 @@ export default function AccountPage() {
       const response = await axios.post('/api/user/addresses', addressData);
       if (response.data.success) {
         setSavedAddresses(prev => [...prev, response.data.address]);
-        setShowAddAddressModal(false);
+      setShowAddAddressModal(false);
         toast.success('Address added successfully');
       }
     } catch (error) {
@@ -149,10 +149,10 @@ export default function AccountPage() {
     try {
       const response = await axios.put(`/api/user/addresses/${addressId}`, addressData);
       if (response.data.success) {
-        setSavedAddresses(prev => 
+      setSavedAddresses(prev => 
           prev.map(addr => addr.id === addressId ? response.data.address : addr)
-        );
-        setShowEditAddressModal(false);
+      );
+      setShowEditAddressModal(false);
         toast.success('Address updated successfully');
       }
     } catch (error) {
@@ -181,8 +181,8 @@ export default function AccountPage() {
       });
       
       if (response.data.success) {
-        setUserData(prev => ({
-          ...prev,
+      setUserData(prev => ({
+        ...prev,
           preferences: {
             ...prev.preferences,
             [key]: value
@@ -197,12 +197,12 @@ export default function AccountPage() {
   };
 
   if (loading) {
-    return (
+      return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
-      </div>
-    );
-  }
+        </div>
+      );
+    }
 
   if (error) {
     return (
@@ -210,18 +210,18 @@ export default function AccountPage() {
         <div className="text-red-500 text-center">
           <p className="text-xl font-semibold mb-2">Error loading profile</p>
           <p>{error}</p>
-          <button 
+            <button
             onClick={fetchUserData}
             className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
           >
             Try Again
-          </button>
-        </div>
+            </button>
+          </div>
       </div>
     );
   }
 
-  return (
+        return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4">
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -230,11 +230,11 @@ export default function AccountPage() {
             <div className="flex items-center space-x-6">
               <div className="relative">
                 <div className="w-24 h-24 rounded-full overflow-hidden bg-purple-300">
-                  <img
-                    src={userData.profileImage}
-                    alt="Profile"
+                <img
+                  src={userData.profileImage}
+                  alt="Profile"
                     className="w-full h-full object-cover"
-                  />
+                />
                 </div>
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -258,12 +258,12 @@ export default function AccountPage() {
                 <p className="text-purple-200 text-sm mt-1">Member since {userData.joinDate}</p>
               </div>
             </div>
-          </div>
+                    </div>
 
           {/* Navigation Tabs */}
           <div className="border-b border-gray-200">
             <nav className="flex">
-              <button
+                        <button
                 onClick={() => setActiveSection('profile')}
                 className={`px-6 py-4 text-sm font-medium ${
                   activeSection === 'profile'
@@ -272,7 +272,7 @@ export default function AccountPage() {
                 }`}
               >
                 Profile
-              </button>
+                        </button>
               <button
                 onClick={() => setActiveSection('addresses')}
                 className={`px-6 py-4 text-sm font-medium ${
@@ -282,8 +282,8 @@ export default function AccountPage() {
                 }`}
               >
                 Addresses
-              </button>
-              <button
+                </button>
+                          <button
                 onClick={() => setActiveSection('preferences')}
                 className={`px-6 py-4 text-sm font-medium ${
                   activeSection === 'preferences'
@@ -292,43 +292,43 @@ export default function AccountPage() {
                 }`}
               >
                 Preferences
-              </button>
+                          </button>
             </nav>
-          </div>
+              </div>
 
           {/* Content Sections */}
           <div className="p-6">
             {activeSection === 'profile' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-purple-50 p-6 rounded-xl">
                     <h3 className="text-lg font-semibold text-purple-900 mb-4">Account Overview</h3>
-                    <div className="space-y-4">
-                      <div>
+                <div className="space-y-4">
+                          <div>
                         <label className="text-sm text-purple-700">Total Rides</label>
                         <p className="text-2xl font-bold text-purple-900">{userData.totalRides}</p>
-                      </div>
-                      <div>
+                          </div>
+                          <div>
                         <label className="text-sm text-purple-700">Wallet Balance</label>
                         <p className="text-2xl font-bold text-purple-900">₹{userData.walletBalance}</p>
-                      </div>
-                    </div>
-                  </div>
-                  
+                </div>
+              </div>
+            </div>
+
                   <div className="bg-purple-50 p-6 rounded-xl">
                     <h3 className="text-lg font-semibold text-purple-900 mb-4">Contact Information</h3>
-                    <div className="space-y-4">
-                      <div>
+              <div className="space-y-4">
+                    <div>
                         <label className="text-sm text-purple-700">Phone Number</label>
                         <p className="text-gray-900">{userData.phone || 'Not added'}</p>
-                      </div>
-                      <div>
+                    </div>
+                    <div>
                         <label className="text-sm text-purple-700">Email</label>
                         <p className="text-gray-900">{userData.email}</p>
-                      </div>
                     </div>
                   </div>
                 </div>
+              </div>
 
                 {userData.transactions.length > 0 && (
                   <div className="mt-8">
@@ -339,49 +339,49 @@ export default function AccountPage() {
                           key={index}
                           className="flex items-center justify-between p-4 border-b last:border-b-0"
                         >
-                          <div>
+                      <div>
                             <p className="font-medium text-gray-900">{transaction.type}</p>
                             <p className="text-sm text-gray-500">
                               {new Date(transaction.date).toLocaleDateString()}
                             </p>
-                          </div>
+                      </div>
                           <div className={`font-medium ${
                             transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
                           }`}>
                             {transaction.amount > 0 ? '+' : '-'}₹{Math.abs(transaction.amount)}
-                          </div>
-                        </div>
-                      ))}
                     </div>
+                          </div>
+                        ))}
+                    </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
             )}
 
             {activeSection === 'addresses' && (
               <div>
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-lg font-semibold text-purple-900">Saved Addresses</h3>
-                  <button
+              <button
                     onClick={() => setShowAddAddressModal(true)}
                     className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                  >
+              >
                     Add New Address
-                  </button>
+              </button>
                 </div>
-
-                <div className="space-y-4">
+            
+              <div className="space-y-4">
                   {savedAddresses.map((address, index) => (
                     <div
                       key={index}
                       className="bg-white p-4 rounded-lg border border-gray-200 flex justify-between items-center"
                     >
-                      <div>
+                  <div>
                         <p className="font-medium text-gray-900">{address.label}</p>
                         <p className="text-gray-600">{address.address}</p>
-                      </div>
+                  </div>
                       <div className="flex space-x-2">
-                        <button
+          <button 
                           onClick={() => {
                             setEditingAddress(address);
                             setShowEditAddressModal(true);
@@ -389,24 +389,24 @@ export default function AccountPage() {
                           className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg"
                         >
                           Edit
-                        </button>
-                        <button
+          </button>
+            <button
                           onClick={() => handleDeleteAddress(address.id)}
                           className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
+            >
                           Delete
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+            </button>
                 </div>
               </div>
+            ))}
+          </div>
+      </div>
             )}
             
             {activeSection === 'preferences' && (
               <div className="space-y-6">
                 {/* Preferences content */}
-              </div>
+          </div>
             )}
           </div>
         </div>

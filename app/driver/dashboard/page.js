@@ -12,6 +12,7 @@ import io from 'socket.io-client';
 import toast, { Toaster } from 'react-hot-toast';
 import RideRequestNotification from '../../components/RideRequestNotification';
 import { calculateDistance } from '../../utils/distance';
+import axios from 'axios';
 
 const PageContainer = styled.div`
   min-height: 100vh;
@@ -385,10 +386,10 @@ export default function DriverDashboard() {
   const [driverProfile, setDriverProfile] = useState(null);
   const [driverId, setDriverId] = useState(null);
   const [earnings, setEarnings] = useState({
-    today: 2500,
-    yesterday: 3200,
-    thisWeek: 15000,
-    thisMonth: 45000
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+    total: 0
   });
   const [rides, setRides] = useState({
     completed: 245,
@@ -396,7 +397,7 @@ export default function DriverDashboard() {
     todayCompleted: 8,
     rating: 4.8
   });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [currentDistance, setCurrentDistance] = useState(0);
   const [currentDuration, setCurrentDuration] = useState(0);
 
@@ -405,31 +406,6 @@ export default function DriverDashboard() {
       router.push('/login');
       return;
     }
-
-    // Fetch driver info
-    const fetchDriverInfo = async () => {
-      try {
-        const response = await fetch('/api/driver/profile');
-        const data = await response.json();
-        if (data.success) {
-          setDriverInfo(data.data);
-          // Generate driver ID if not exists and update it in the database
-          const newDriverId = data.data.driverId || generateDriverId();
-          setDriverId(newDriverId);
-          
-          // If there was no driver ID, update it in the database
-          if (!data.data.driverId) {
-            await updateDriverStatusInDB(false); // This will save the new driver ID
-          }
-        } else {
-          console.error('Failed to fetch driver profile:', data.error);
-          toast.error('Failed to load driver profile');
-        }
-      } catch (error) {
-        console.error('Error fetching driver profile:', error);
-        toast.error('Error loading driver profile');
-      }
-    };
 
     fetchDriverInfo();
   }, [status, router]);
@@ -485,10 +461,47 @@ export default function DriverDashboard() {
     };
   }, [isOnline, socket, driverInfo]);
 
-  const handleStatusToggle = () => {
-    setIsOnline(!isOnline);
-    if (socket) {
-      socket.emit('updateDriverStatus', !isOnline ? 'online' : 'offline');
+  const fetchDriverInfo = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/api/driver/profile');
+      setDriverInfo(response.data.data);
+      setIsOnline(response.data.data.isActive || false);
+      setEarnings({
+        today: response.data.data.earnings?.today || 0,
+        thisWeek: response.data.data.earnings?.thisWeek || 0,
+        thisMonth: response.data.data.earnings?.thisMonth || 0,
+        total: response.data.data.earnings?.total || 0
+      });
+      // Generate driver ID if not exists and update it in the database
+      const newDriverId = response.data.data.driverId || generateDriverId();
+      setDriverId(newDriverId);
+      
+      // If there was no driver ID, update it in the database
+      if (!response.data.data.driverId) {
+        await updateDriverStatusInDB(false); // This will save the new driver ID
+      }
+    } catch (error) {
+      console.error('Error fetching driver info:', error);
+      toast.error('Failed to load driver information');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusToggle = async () => {
+    try {
+      const response = await axios.put('/api/driver/status', {
+        isActive: !isOnline
+      });
+      
+      if (response.data.success) {
+        setIsOnline(!isOnline);
+        toast.success(isOnline ? 'You are now offline' : 'You are now online');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      toast.error('Failed to update status');
     }
   };
 
@@ -868,16 +881,16 @@ console.log("emitted ride accepted")
               <p>Today's Earnings</p>
             </StatItem>
             <StatItem>
-              <h3>₹{earnings.yesterday}</h3>
-              <p>Yesterday's Earnings</p>
-            </StatItem>
-            <StatItem>
               <h3>₹{earnings.thisWeek}</h3>
               <p>This Week</p>
             </StatItem>
             <StatItem>
               <h3>₹{earnings.thisMonth}</h3>
               <p>This Month</p>
+            </StatItem>
+            <StatItem>
+              <h3>₹{earnings.total}</h3>
+              <p>Total Earnings</p>
             </StatItem>
           </StatGrid>
         </EarningsCard>

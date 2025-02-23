@@ -274,7 +274,7 @@ export const Web3Integration = ({ ride, onPaymentComplete }) => {
                             })}
                         </div>
                         <textarea
-                            className="w-full p-3 border border-gray-300 rounded-lg mb-4"
+                            className="w-full p-3 border border-gray-300 text-black rounded-lg mb-4"
                             placeholder="Share your experience (optional)"
                             value={feedback}
                             onChange={(e) => setFeedback(e.target.value)}

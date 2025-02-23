@@ -21,86 +21,60 @@ const connectDB = async () => {
 const rideSchema = new mongoose.Schema({
   rideId: {
     type: String,
+    required: true,
     unique: true
   },
-  requestId: {
-    type: String,
-  },
+  requestId: String,
   driverId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Driver',
+    required: true
   },
-  userId: {
+  user: {
     type: String,
+    required: true
   },
   userEmail: {
     type: String,
     required: true
   },
-  socketId: {
-    type: String,
-  },
+  socketId: String,
   otp: {
     type: String,
-    required: true,
-    length: 4
+    required: true
   },
-  pickupLocation: {
-    lat: {
-      type: Number,
-    },
-    lng: {
-      type: Number,
-    },
-    address: {
-      type: String,
-    }
+  pickup: {
+    type: Object,
+    required: true
   },
-  dropLocation: {
-    lat: {
-      type: Number,
-    },
-    lng: {
-      type: Number,
-    },
-    address: {
-      type: String,
-    }
+  destination: {
+    type: Object,
+    required: true
   },
   status: {
     type: String,
     enum: ['pending', 'accepted', 'in_progress', 'completed', 'cancelled'],
     default: 'pending'
   },
-  distance: {
-    type: String,
-  },
-  duration: {
-    type: String,
-  },
-  vehicleType: {
-    type: Number,
-  },
-  estimatedFare: {
-    type: Number,
-  },
+  distance: String,
+  duration: String,
+  vehicleType: Number,
+  fare: Number,
   userDetails: {
-    name: {
-      type: String,
-      default: 'Anonymous'
-    },
-    phoneNumber: {
-      type: String,
-      default: 'Not provided'
-    },
-    email: {
-      type: String,
-      default: 'Not provided'
-    },
-    gender: {
-      type: String,
-      default: 'Not specified'
-    }
+    name: String,
+    phoneNumber: String,
+    email: String,
+    gender: String
+  },
+  date: {
+    type: Date,
+    required: true,
+    default: Date.now
+  },
+  time: {
+    type: String,
+    required: true,
+    default: new Date().toLocaleTimeString()
   },
   startTime: {
     type: Date,
@@ -124,6 +98,7 @@ export async function POST(req) {
 
     await connectDB();
     const { rideId, tripRequest } = await req.json();
+
     console.log('Trip Request:', tripRequest);
 
     if (!rideId || !tripRequest) {
@@ -147,7 +122,7 @@ export async function POST(req) {
     if (ride) {
       // Update existing ride
       ride.driverId = driver._id;
-      ride.status = 'accepted';
+      ride.status = 'in_progress';
       ride.startTime = currentDate;
       ride.otp = otp;
       ride.userEmail = tripRequest.userDetails.email;
@@ -158,17 +133,19 @@ export async function POST(req) {
         rideId,
         requestId: tripRequest.requestId,
         driverId: driver._id,
-        userId: tripRequest.userId,
+        user: tripRequest.userId,
         userEmail: tripRequest.userDetails.email,
         socketId: tripRequest.socketId,
-        pickupLocation: tripRequest.pickupLocation,
-        dropLocation: tripRequest.dropLocation,
+        pickup: tripRequest.pickupLocation,
+        destination: tripRequest.dropLocation,
         status: 'in_progress',
         distance: tripRequest.distance,
         duration: tripRequest.duration,
         vehicleType: tripRequest.vehicleType,
-        estimatedFare: tripRequest.estimatedFare,
+        fare: tripRequest.estimatedFare,
         userDetails: tripRequest.userDetails,
+        date: currentDate,
+        time: currentDate.toLocaleTimeString(),
         startTime: currentDate,
         otp: otp
       };

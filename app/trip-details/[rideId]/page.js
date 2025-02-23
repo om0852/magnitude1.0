@@ -310,9 +310,9 @@ export default function TripDetails({ params }) {
   const [toCoords, setToCoords] = useState(null);
   const [showMap, setShowMap] = useState(false);
   const [liveStats, setLiveStats] = useState({
-    distance: '0',
-    duration: '0',
-    fare: '0'
+    distance: trip?.distance || '0',
+    duration: trip?.duration || '0',
+    fare: trip?.estimatedFare || '0'
   });
   const [driverLocation, setDriverLocation] = useState(null);
   const [socket, setSocket] = useState(null);
@@ -326,10 +326,19 @@ export default function TripDetails({ params }) {
   // Function to calculate route between two points
   const calculateRoute = async (start, end) => {
     try {
-      const response = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`
-      );
+      // Ensure coordinates are in the correct format (lng,lat)
+      console.log('Calculating route with coordinates:', start, end);
+      
+      // Swap lat/lng if needed to match OSRM's expected format
+      const startCoord = `${start.lng},${start.lat}`;
+      const endCoord = `${end.lng},${end.lat}`;
+      
+      const url = `https://router.project-osrm.org/route/v1/driving/${startCoord};${endCoord}?overview=full&geometries=geojson`;
+      console.log('OSRM URL:', url);
+
+      const response = await fetch(url);
       const data = await response.json();
+      console.log('OSRM Response:', data);
 
       if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
         throw new Error('No route found');
@@ -340,6 +349,7 @@ export default function TripDetails({ params }) {
       const distance = (route.distance / 1000).toFixed(1); // Convert to km
       const duration = Math.round(route.duration / 60); // Convert to minutes
 
+      console.log('Calculated route:', { distance, duration, coordinates: coordinates.length });
       return {
         coordinates,
         distance,
@@ -409,37 +419,79 @@ export default function TripDetails({ params }) {
 
   // Update trip coordinates
   const updateTripCoordinates = async (trip) => {
-    console.log(trip)
-    if (trip?.pickupLocation?.address && trip?.dropLocation?.address) {
-      console.log(trip.pickupLocation.address, trip.dropLocation.address)
-      try {
-        const pickup = await getCoordinates(trip.pickupLocation.address);
-        const dropoff = await getCoordinates(trip.dropLocation.address);
+    try {
+      console.log('Full trip data:', trip);
 
-        if (pickup && dropoff) {
-          setFromCoords(pickup);
-          setToCoords(dropoff);
-          setShowMap(true);
-
-          // Calculate route between pickup and dropoff
-          const routeData = await calculateRoute(
-            { lat: pickup[0], lng: pickup[1] },
-            { lat: dropoff[0], lng: dropoff[1] }
-          );
-
-          if (routeData) {
-            setRoutePoints(routeData.coordinates);
-            setLiveStats(prev => ({
-              ...prev,
-              distance: routeData.distance,
-              duration: routeData.duration
-            }));
-          }
-        }
-      } catch (error) {
-        console.error('Error updating coordinates:', error);
-        setError('Could not load trip route');
+      // Get pickup coordinates with fallbacks
+      let pickup = null;
+      if (trip?.pickup?.coordinates) {
+        pickup = trip.pickup.coordinates;
+      } else if (trip?.pickupLocation?.coordinates) {
+        pickup = trip.pickupLocation.coordinates;
       }
+
+      // Get dropoff coordinates with fallbacks
+      let dropoff = null;
+      if (trip?.destination?.coordinates) {
+        dropoff = trip.destination.coordinates;
+      } else if (trip?.dropLocation?.coordinates) {
+        dropoff = trip.dropLocation.coordinates;
+      }
+
+      console.log('Extracted coordinates:', { pickup, dropoff });
+
+      // Validate coordinates
+      const isValidCoordinate = (coord) => {
+        return Array.isArray(coord) && 
+               coord.length === 2 && 
+               !isNaN(parseFloat(coord[0])) && 
+               !isNaN(parseFloat(coord[1]));
+      };
+
+      if (!isValidCoordinate(pickup)) {
+        console.error('Invalid pickup coordinates:', pickup);
+        return;
+      }
+
+      if (!isValidCoordinate(dropoff)) {
+        console.error('Invalid dropoff coordinates:', dropoff);
+        return;
+      }
+
+      // Ensure coordinates are in the correct format
+      const startPoint = { 
+        lat: parseFloat(pickup[0]), 
+        lng: parseFloat(pickup[1])
+      };
+      const endPoint = { 
+        lat: parseFloat(dropoff[0]), 
+        lng: parseFloat(dropoff[1])
+      };
+
+      console.log('Formatted coordinates:', { startPoint, endPoint });
+
+      setFromCoords(pickup);
+      setToCoords(dropoff);
+      setShowMap(true);
+
+      // Calculate route between pickup and dropoff
+      const routeData = await calculateRoute(startPoint, endPoint);
+
+      if (routeData) {
+        console.log('Route calculated successfully:', routeData);
+        setRoutePoints(routeData.coordinates);
+        setLiveStats(prev => ({
+          ...prev,
+          distance: trip.distance || routeData.distance || '0',
+          duration: trip.duration || routeData.duration || '0',
+          fare: trip.estimatedFare || trip.fare || '0'
+        }));
+      } else {
+        console.error('Failed to calculate route');
+      }
+    } catch (error) {
+      console.error('Error in updateTripCoordinates:', error);
+      setError('Could not load trip route');
     }
   };
 
@@ -451,27 +503,32 @@ export default function TripDetails({ params }) {
     // Listen for driver location updates
     newSocket.on('driverLocationUpdate', (data) => {
       if (data.rideId === rideId) {
-        setDriverLocation({
-          lat: data.lat,
-          lng: data.lng,
+        const newDriverLocation = {
+          lat: parseFloat(data.lat),
+          lng: parseFloat(data.lng),
           timestamp: data.timestamp
-        });
+        };
+        
+        console.log('New driver location:', newDriverLocation);
+        setDriverLocation(newDriverLocation);
 
         // If we have both driver location and destination, update route
         if (toCoords) {
-          calculateRoute(
-            { lat: data.lat, lng: data.lng },
-            { lat: toCoords[0], lng: toCoords[1] }
-          ).then(routeData => {
-            if (routeData) {
-              setRoutePoints(routeData.coordinates);
-              setLiveStats(prev => ({
-                ...prev,
-                distance: routeData.distance,
-                duration: routeData.duration
-              }));
-            }
-          });
+          const destination = { lat: parseFloat(toCoords[0]), lng: parseFloat(toCoords[1]) };
+          console.log('Calculating route to destination:', destination);
+          
+          calculateRoute(newDriverLocation, destination)
+            .then(routeData => {
+              if (routeData) {
+                console.log('Updated route with new driver location:', routeData);
+                setRoutePoints(routeData.coordinates);
+                setLiveStats(prev => ({
+                  ...prev,
+                  distance: routeData.distance,
+                  duration: routeData.duration
+                }));
+              }
+            });
         }
       }
     });
@@ -501,12 +558,28 @@ export default function TripDetails({ params }) {
       try {
         setLoading(true);
         const response = await axios.get(`/api/rides/${rideId}`);
-        setTrip(response.data.data);
-        console.log(response.data.data);
-        await updateTripCoordinates(response.data.data);
+        const tripData = response.data.data;
+        console.log('Received trip data:', tripData);
+
+        // Validate trip data
+        if (!tripData) {
+          throw new Error('No trip data received');
+        }
+
+        setTrip(tripData);
+        
+        // Initialize live stats with trip data
+        setLiveStats({
+          distance: tripData.distance || '0',
+          duration: tripData.duration || '0',
+          fare: tripData.estimatedFare || tripData.fare || '0'
+        });
+        
+        await updateTripCoordinates(tripData);
         getCurrentLocation();
-        await checkTransactionStatus(); // Check transaction status
+        await checkTransactionStatus();
       } catch (err) {
+        console.error('Error fetching trip details:', err);
         setError('Failed to load trip details');
       } finally {
         setLoading(false);
@@ -609,16 +682,16 @@ export default function TripDetails({ params }) {
           <h2>Live Trip Stats</h2>
           <LiveStats>
             <div className="stat">
-              <h4>Distance Remaining</h4>
-              <p>{liveStats.distance} km</p>
+              <h4>Distance</h4>
+              <p>{trip?.distance || liveStats.distance} km</p>
             </div>
             <div className="stat">
-              <h4>Estimated Time</h4>
-              <p>{liveStats.duration} mins</p>
+              <h4>Duration</h4>
+              <p>{trip?.duration || liveStats.duration} mins</p>
             </div>
             <div className="stat">
-              <h4>Estimated Fare</h4>
-              <p>₹{liveStats.fare}</p>
+              <h4>Fare</h4>
+              <p>₹{trip?.estimatedFare || trip?.fare || liveStats.fare}</p>
             </div>
           </LiveStats>
 
@@ -637,28 +710,34 @@ export default function TripDetails({ params }) {
 
         <Section>
           <h2>Driver Information</h2>
-          <DriverInfo>
-            <div className="avatar">
-              {trip.driverPhoto ? (
-                <Image
-                  src={trip.driverPhoto}
-                  alt="Driver"
-                  width={64}
-                  height={64}
-                  className="rounded-full"
-                />
-              ) : (
-                <FaUser size={24} />
-              )}
+          {trip.driverDetails ? (
+            <DriverInfo>
+              <div className="avatar">
+                {trip.driverDetails.photo ? (
+                  <Image
+                    src={trip.driverDetails.photo}
+                    alt="Driver"
+                    width={64}
+                    height={64}
+                    className="rounded-full"
+                  />
+                ) : (
+                  <FaUser size={24} />
+                )}
+              </div>
+              <div className="details">
+                <h3>{trip.driverDetails.name}</h3>
+                <p><FaCar /> {trip.driverDetails.vehicleNumber}</p>
+                <p><FaPhone /> {trip.driverDetails.contactNumber}</p>
+                <p>⭐ {trip.driverDetails.rating} Rating</p>
+                <p><FaRoute /> {trip.driverDetails.totalRides} Rides Completed</p>
+              </div>
+            </DriverInfo>
+          ) : (
+            <div className="text-gray-500 text-center py-4">
+              Driver details not available
             </div>
-            <div className="details">
-              <h3>{trip.driverDetails.name}</h3>
-              <p><FaCar /> {trip.driverDetails.vehicleNumber}</p>
-              <p><FaPhone /> {trip.driverDetails.contactNumber}</p>
-              <p>⭐ {trip.driverDetails.rating || '4.5'} Rating</p>
-              <p><FaRoute /> {trip.driverDetails.totalRides || '0'} Rides Completed</p>
-            </div>
-          </DriverInfo>
+          )}
         </Section>
 
         <Section>
@@ -668,35 +747,17 @@ export default function TripDetails({ params }) {
               <FaMapMarkerAlt className="icon" size={20} />
               <div className="text">
                 <h4>Pickup Location</h4>
-                <p>{trip.pickupLocation.address}</p>
+                <p>{trip.pickup?.address || trip.pickupLocation?.address || 'Loading pickup location...'}</p>
               </div>
             </div>
             <div className="location-item">
               <FaMapMarkerAlt className="icon" size={20} />
               <div className="text">
                 <h4>Drop Location</h4>
-                <p>{trip.dropLocation.address}</p>
+                <p>{trip.destination?.address || trip.dropLocation?.address || 'Loading drop location...'}</p>
               </div>
             </div>
           </LocationInfo>
-        </Section>
-
-        <Section>
-          <h2>Trip Stats</h2>
-          <TripStats>
-            <div className="stat-item">
-              <h4>Distance</h4>
-              <p>{trip.distance} km</p>
-            </div>
-            <div className="stat-item">
-              <h4>Duration</h4>
-              <p>{trip.duration}</p>
-            </div>
-            <div className="stat-item">
-              <h4>Fare</h4>
-              <p>₹{trip.estimatedFare}</p>
-            </div>
-          </TripStats>
         </Section>
 
         {trip.status === 'completed' && (
@@ -744,7 +805,7 @@ export default function TripDetails({ params }) {
                         })}
                       </div>
                       <textarea
-                        className="w-full p-3 border border-gray-300 rounded-lg mb-4"
+                        className="w-full p-3 border border-gray-300 text-black rounded-lg mb-4"
                         placeholder="Share your experience with the driver (optional)"
                         value={feedback}
                         onChange={(e) => setFeedback(e.target.value)}

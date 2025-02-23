@@ -11,7 +11,7 @@ export async function GET(request, { params }) {
     }
 
     await connectDB();
-    const { rideId } = params;
+    const { rideId } = await params;
 
     if (!rideId) {
       return NextResponse.json(
