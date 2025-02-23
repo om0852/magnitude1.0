@@ -61,23 +61,33 @@ export const Web3Integration = ({ ride, onPaymentComplete }) => {
 
     const storeTransaction = async (transactionData) => {
         try {
-            const response = await axios.post('/api/transactions', {
+            // Convert BigInt values to strings
+            const formattedData = {
                 rideId: ride.rideId,
                 fromAddress: account,
                 toAddress: ride.driverDetails.walletAddress,
                 amount: ride.estimatedFare.toString(),
                 transactionHash: transactionData.transactionHash,
                 status: 'completed',
-                gasUsed: transactionData.gasUsed,
-                blockNumber: transactionData.blockNumber
-            });
+                gasUsed: transactionData.gasUsed.toString(), // Convert BigInt to string
+                blockNumber: Number(transactionData.blockNumber) // Convert to regular number
+            };
+
+            const response = await axios.post('/api/transactions', formattedData);
 
             if (response.data.success) {
                 setTransactionStatus('completed');
+                toast.success('Transaction details stored successfully!', {
+                    duration: 3000,
+                    icon: '📝',
+                });
+            } else {
+                throw new Error(response.data.error || 'Failed to store transaction');
             }
         } catch (error) {
             console.error('Error storing transaction:', error);
-            toast.error('Failed to store transaction details');
+            toast.error('Failed to store transaction details: ' + (error.response?.data?.error || error.message));
+            throw error;
         }
     };
 
@@ -131,9 +141,14 @@ export const Web3Integration = ({ ride, onPaymentComplete }) => {
             });
 
             console.log('Transaction hash:', txHash);
+            toast.success('Transaction initiated! Waiting for confirmation...', {
+                duration: 10000,
+                icon: '⏳'
+            });
 
             // Wait for transaction receipt
             const receipt = await web3.eth.getTransactionReceipt(txHash);
+            console.log('Transaction receipt:', receipt);
             
             // Store transaction details with original rupee amount
             await storeTransaction({
@@ -142,7 +157,11 @@ export const Web3Integration = ({ ride, onPaymentComplete }) => {
                 blockNumber: receipt.blockNumber
             });
             
-            toast.success('Payment successful');
+            toast.success(`Payment of ₹${ride.estimatedFare} completed successfully!`, {
+                duration: 5000,
+                icon: '💰',
+            });
+
             if (onPaymentComplete) {
                 onPaymentComplete();
             }
