@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import styled from 'styled-components';
 import { motion } from 'framer-motion';
-import { FaCar, FaMoneyBillWave, FaRoute, FaUserClock, FaCog, FaUser } from 'react-icons/fa';
+import { FaCar, FaMoneyBillWave, FaRoute, FaUserClock, FaCog, FaUser, FaStar, FaCalendarAlt, FaChartLine } from 'react-icons/fa';
 import { MdLocationOn, MdTimer } from 'react-icons/md';
 import Image from 'next/image';
 import io from 'socket.io-client';
@@ -225,23 +225,36 @@ const Stats = styled.div`
 `;
 
 const StatCard = styled(Card)`
-  text-align: center;
-  
-  h3 {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  .icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: ${props => props.iconBg || '#f3e8ff'};
+    color: ${props => props.iconColor || '#9333ea'};
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 1.5rem;
-    color: #4a5568;
-    margin-bottom: 0.5rem;
   }
 
-  p {
-    color: #718096;
-    font-size: 0.875rem;
-  }
+  .content {
+    flex: 1;
 
-  svg {
-    font-size: 1.5rem;
-    color: #9f7aea;
-    margin-bottom: 0.5rem;
+    h3 {
+      color: #6b7280;
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .value {
+      color: #1f2937;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
   }
 `;
 
@@ -373,6 +386,26 @@ const DashboardContainer = styled.div`
   padding: 2rem;
 `;
 
+const RecentRidesCard = styled(Card)`
+  grid-column: span 2;
+
+  @media (max-width: 1024px) {
+    grid-column: span 1;
+  }
+
+  h2 {
+    color: #4b5563;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .rides-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+`;
+
 export default function DriverDashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -400,6 +433,15 @@ export default function DriverDashboard() {
   const [loading, setLoading] = useState(true);
   const [currentDistance, setCurrentDistance] = useState(0);
   const [currentDuration, setCurrentDuration] = useState(0);
+  const [dashboardData, setDashboardData] = useState({
+    totalRides: 0,
+    todayRides: 0,
+    totalEarnings: 0,
+    todayEarnings: 0,
+    completionRate: 0,
+    averageRating: 0,
+    recentRides: []
+  });
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -808,6 +850,22 @@ console.log("emitted ride accepted")
     </div>
   );
 
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await axios.get('/api/driver/dashboard');
+        if (response.data.success) {
+          setDashboardData(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast.error('Failed to load dashboard data');
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
   if (status === 'loading') {
     return <PageContainer>Loading...</PageContainer>;
   }
@@ -949,6 +1007,29 @@ console.log("emitted ride accepted")
             ))}
           </RidesList>
         </Card>
+
+        <RecentRidesCard>
+          <h2>Recent Rides</h2>
+          <div className="rides-list">
+            {dashboardData.recentRides.map((ride, index) => (
+              <RideItem key={index} status={ride.status}>
+                <div className="ride-info">
+                  <div className="locations">
+                    {ride.pickupLocation.address} → {ride.dropLocation.address}
+                  </div>
+                  <div className="details">
+                    <span>₹{ride.fare}</span>
+                    <span>•</span>
+                    <span>{new Date(ride.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div className="ride-status">
+                  {ride.status.charAt(0).toUpperCase() + ride.status.slice(1)}
+                </div>
+              </RideItem>
+            ))}
+          </div>
+        </RecentRidesCard>
       </DashboardGrid>
 
       {/* Ride Request Notification */}

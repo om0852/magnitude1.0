@@ -1,43 +1,45 @@
 import { NextResponse } from 'next/server';
-import { connectDB } from '../../../lib/mongodb';
-import Transaction from '../../../models/Transaction';
+import { connectToDatabase } from '../../../lib/mongodb';
 import { getServerSession } from 'next-auth';
+import { authOptions } from '../../auth/[...nextauth]/route';
 
 export async function GET(request, { params }) {
   try {
-    const session = await getServerSession();
+    // Get the current session
+    const session = await getServerSession(authOptions);
+    
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await connectDB();
-    const { rideId } = await params;
+    const { rideId } = params;
+    const { db } = await connectToDatabase();
 
-    if (!rideId) {
-      return NextResponse.json(
-        { error: 'Ride ID is required' },
-        { status: 400 }
-      );
-    }
-
-    // Find transaction for the ride
-    const transaction = await Transaction.findOne({ rideId }).lean();
+    // Find the transaction for this ride
+    const transaction = await db.collection('transactions').findOne({ rideId });
 
     if (!transaction) {
-      return NextResponse.json({
-        success: true,
+      return NextResponse.json({ 
+        success: true, 
         data: { status: 'pending' }
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: transaction
-    });
-  } catch (error) {
-    console.error('Error fetching transaction:', error);
     return NextResponse.json({ 
-      error: error.message || 'Failed to fetch transaction' 
-    }, { status: 500 });
+      success: true, 
+      data: {
+        status: transaction.status,
+        amount: transaction.amount,
+        paymentMethod: transaction.paymentMethod,
+        timestamp: transaction.timestamp
+      }
+    });
+
+  } catch (error) {
+    console.error('Error checking transaction status:', error);
+    return NextResponse.json(
+      { error: 'Failed to check transaction status' },
+      { status: 500 }
+    );
   }
 } 

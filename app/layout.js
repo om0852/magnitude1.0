@@ -5,6 +5,7 @@ import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 import StyledComponentsRegistry from './lib/registry';
 import Navbar from './components/Navbar';
+import { usePathname } from 'next/navigation';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -18,12 +19,18 @@ const inter = Inter({
 
 
 export default function RootLayout({ children }) {
+  const pathname = usePathname();
+  
+  // Check if the current path is in the driver section
+  const isDriverRoute = pathname?.startsWith('/driver');
+
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
         <SessionProvider>
           <StyledComponentsRegistry>
-            <Navbar />
+            {/* Only show the Navbar if we're not in a driver route */}
+            {!isDriverRoute && <Navbar />}
             <main>
               {children}
             </main>

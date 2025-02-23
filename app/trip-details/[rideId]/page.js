@@ -295,6 +295,39 @@ const PaymentSection = styled.div`
     color: #6B7280;
     margin-bottom: 1.5rem;
   }
+
+  .metamask-button {
+    background: linear-gradient(135deg, #F6851B, #E4761B);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(246, 133, 27, 0.2);
+    }
+
+    &:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    img {
+      width: 24px;
+      height: 24px;
+    }
+  }
 `;
 
 export default function TripDetails({ params }) {
@@ -322,6 +355,8 @@ export default function TripDetails({ params }) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(null);
   const [feedback, setFeedback] = useState('');
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState('pending');
 
   // Function to calculate route between two points
   const calculateRoute = async (start, end) => {
@@ -581,10 +616,10 @@ export default function TripDetails({ params }) {
 
         // Validate required fields
         if (!tripData.pickupLocation && !tripData.pickup) {
-          console.error('Missing pickup location data');
+          // console.error('Missing pickup location data');
         }
         if (!tripData.dropLocation && !tripData.destination) {
-          console.error('Missing drop location data');
+          // console.error('Missing drop location data');
         }
 
         // Format locations if they exist
@@ -676,6 +711,52 @@ export default function TripDetails({ params }) {
     } catch (error) {
       console.error('Error submitting rating:', error);
       toast.error(error.response?.data?.error || 'Failed to submit rating. Please try again.');
+    }
+  };
+
+  // Add function to handle MetaMask payment
+  const handleMetaMaskPayment = async () => {
+    try {
+      setIsProcessingPayment(true);
+      
+      // Check if MetaMask is installed
+      if (!window.ethereum) {
+        toast.error('Please install MetaMask to make a payment');
+        return;
+      }
+
+      // Request account access
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+
+      // Create transaction
+      const response = await axios.post('/api/transactions/create', {
+        rideId,
+        amount: trip.estimatedFare || trip.fare,
+        paymentMethod: 'ETH'
+      });
+
+      if (response.data.success) {
+        // Start transaction status polling
+        const pollInterval = setInterval(async () => {
+          const statusResponse = await axios.get(`/api/transactions/${rideId}`);
+          if (statusResponse.data.success) {
+            const status = statusResponse.data.data.status;
+            setPaymentStatus(status);
+            
+            if (status === 'completed') {
+              clearInterval(pollInterval);
+              toast.success('Payment completed successfully!');
+            }
+          }
+        }, 5000);
+
+        toast.success('Payment initiated. Please confirm in MetaMask.');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast.error(error.message || 'Failed to process payment');
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -840,61 +921,73 @@ export default function TripDetails({ params }) {
             <PaymentSection>
               <div className="bg-white p-6 rounded-xl border border-gray-200">
                 <div className="text-center">
-                  <h3 className="text-xl font-semibold mb-2 text-green-600">Payment Completed</h3>
-                  <p className="text-gray-600 mb-4">Thank you for using our service!</p>
-                  
-                  {transactionStatus !== 'rated' ? (
+                  {paymentStatus === 'completed' ? (
                     <>
-                      <p className="text-gray-600 mb-4">Please rate your driver.</p>
-                      <div className="flex items-center justify-center mb-4">
-                        {[...Array(5)].map((_, index) => {
-                          const ratingValue = index + 1;
-                          return (
-                            <button
-                              type="button"
-                              key={ratingValue}
-                              className={`text-3xl mr-2 focus:outline-none transition-colors duration-200 ${
-                                (hover || rating) >= ratingValue
-                                  ? 'text-yellow-400'
-                                  : 'text-gray-300'
-                              }`}
-                              onClick={() => setRating(ratingValue)}
-                              onMouseEnter={() => setHover(ratingValue)}
-                              onMouseLeave={() => setHover(null)}
-                            >
-                              <FaStar />
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <textarea
-                        className="w-full p-3 border border-gray-300 text-black rounded-lg mb-4"
-                        placeholder="Share your experience with the driver (optional)"
-                        value={feedback}
-                        onChange={(e) => setFeedback(e.target.value)}
-                        rows="3"
-                      />
-                      <button
-                        onClick={submitRating}
-                        disabled={!rating}
-                        className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                      >
-                        Submit Rating
-                      </button>
+                      <h3 className="text-xl font-semibold mb-2 text-green-600">Payment Completed</h3>
+                      <p className="text-gray-600 mb-4">Thank you for using our service!</p>
+                      
+                      {transactionStatus !== 'rated' ? (
+                        <>
+                          <p className="text-gray-600 mb-4">Please rate your driver.</p>
+                          <div className="flex items-center justify-center mb-4">
+                            {[...Array(5)].map((_, index) => {
+                              const ratingValue = index + 1;
+                              return (
+                                <button
+                                  type="button"
+                                  key={ratingValue}
+                                  className={`text-3xl mr-2 focus:outline-none transition-colors duration-200 ${
+                                    (hover || rating) >= ratingValue
+                                      ? 'text-yellow-400'
+                                      : 'text-gray-300'
+                                  }`}
+                                  onClick={() => setRating(ratingValue)}
+                                  onMouseEnter={() => setHover(ratingValue)}
+                                  onMouseLeave={() => setHover(null)}
+                                >
+                                  <FaStar />
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <textarea
+                            className="w-full p-3 border border-gray-300 text-black rounded-lg mb-4"
+                            placeholder="Share your experience with the driver (optional)"
+                            value={feedback}
+                            onChange={(e) => setFeedback(e.target.value)}
+                            rows="3"
+                          />
+                          <button
+                            onClick={submitRating}
+                            disabled={!rating}
+                            className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                          >
+                            Submit Rating
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-center">
+                          <h3 className="text-xl font-semibold mb-2 text-green-600">Rating Submitted</h3>
+                          <div className="flex justify-center mb-2">
+                            {[...Array(rating)].map((_, index) => (
+                              <FaStar key={index} className="text-yellow-400 text-2xl" />
+                            ))}
+                          </div>
+                          {feedback && (
+                            <p className="text-gray-600 italic">"{feedback}"</p>
+                          )}
+                          <p className="text-gray-600 mt-4">Thank you for your feedback!</p>
+                        </div>
+                      )}
                     </>
                   ) : (
-                    <div className="text-center">
-                      <h3 className="text-xl font-semibold mb-2 text-green-600">Rating Submitted</h3>
-                      <div className="flex justify-center mb-2">
-                        {[...Array(rating)].map((_, index) => (
-                          <FaStar key={index} className="text-yellow-400 text-2xl" />
-                        ))}
-                      </div>
-                      {feedback && (
-                        <p className="text-gray-600 italic">"{feedback}"</p>
-                      )}
-                      <p className="text-gray-600 mt-4">Thank you for your feedback!</p>
-                    </div>
+                    <Web3Integration 
+                      ride={trip} 
+                      onPaymentComplete={() => {
+                        setPaymentStatus('completed');
+                        checkTransactionStatus();
+                      }}
+                    />
                   )}
                 </div>
               </div>
