@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@metamask/detect-provider": "^2.0.0",
     "axios": "^1.7.9",
     "framer-motion": "^12.4.7",
     "leaflet": "^1.9.4",

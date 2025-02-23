@@ -30,7 +30,8 @@ export async function GET(request, { params }) {
           vehicleModel: driver.vehicleModel,
           rating: driver.rating || 4.5,
           totalRides: driver.totalRides || 0,
-          photo: driver.photo
+          photo: driver.photo,
+          walletAddress: driver.walletAddress
         };
       }
     }

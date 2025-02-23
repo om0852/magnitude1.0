@@ -10,6 +10,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import io from 'socket.io-client';
 import { toast } from 'react-hot-toast';
 import { useSession } from 'next-auth/react';
+import { Web3Integration } from '../components/Web3Integration';
 
 // Fix for default marker icons in Leaflet
 const sourceIcon = L.icon({
@@ -714,6 +715,8 @@ export default function BookRide() {
   const [matchedDriver, setMatchedDriver] = useState(null);
   const [searchingForDriver, setSearchingForDriver] = useState(false);
   const [nearbyDrivers, setNearbyDrivers] = useState([]);
+  const [tripStatus, setTripStatus] = useState('');
+  const [tripDetails, setTripDetails] = useState(null);
   
   const fromInputRef = useRef(null);
   const toInputRef = useRef(null);
@@ -758,6 +761,20 @@ export default function BookRide() {
       };
     }
   }, [status, session]);
+
+  // Add socket event listener for trip status updates
+  useEffect(() => {
+    if (socket) {
+      socket.on('tripStatusUpdated', (data) => {
+        setTripStatus(data.status);
+        setTripDetails(data);
+      });
+
+      return () => {
+        socket.off('tripStatusUpdated');
+      };
+    }
+  }, [socket]);
 
   const handleDriverAccepted = (response) => {
     const { rideId, driverName } = response;
@@ -1360,6 +1377,31 @@ export default function BookRide() {
             {matchedDriver ? 'Cancel Ride' : 'Cancel'}
           </CancelButton>
         </BottomDrawer>
+
+        {/* Payment Section - Show when trip is completed */}
+        {tripStatus === 'completed' && tripDetails && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white p-6 shadow-lg border-t border-gray-200">
+            <div className="max-w-xl mx-auto">
+              <div className="mb-4">
+                <h3 className="text-xl font-semibold text-purple-900 mb-2">
+                  Complete Your Payment
+                </h3>
+                <p className="text-gray-600">
+                  Please complete the payment for your ride using MetaMask
+                </p>
+              </div>
+
+              <Web3Integration 
+                ride={tripDetails}
+                onPaymentComplete={() => {
+                  toast.success('Payment completed successfully');
+                  // Additional logic after payment
+                  setTripStatus('paid');
+                }}
+              />
+            </div>
+          </div>
+        )}
       </BookingCard>
     </BookingContainer>
   );

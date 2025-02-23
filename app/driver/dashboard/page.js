@@ -91,7 +91,7 @@ const StatusToggle = styled.button`
   &.online {
     background: #10B981;
     color: white;
-    &:hover {
+  &:hover {
       background: #059669;
     }
   }
@@ -522,7 +522,7 @@ export default function DriverDashboard() {
         distance: currentRequest.distance || '0',
         duration: currentRequest.duration || '0m',
         vehicleType: parseInt(currentRequest.vehicleType) || 1,
-        estimatedFare: parseFloat(currentRequest.estimatedFare) || 0,
+        estimatedFare: parseFloat(currentRequest.fare) || 0,
         userDetails: {
           name: currentRequest.name || 'Anonymous',
           phoneNumber: currentRequest.phoneNumber || 'Not provided',
@@ -684,7 +684,7 @@ console.log("emitted ride accepted")
         const duration = Math.round(data.routes[0].duration / 60); // Convert to minutes
         setCurrentDistance(routeDistance);
         setCurrentDuration(duration);
-      } else {
+    } else {
         // Fallback to straight-line distance if route calculation fails
         setCurrentDistance(distance.toFixed(1));
         setCurrentDuration(Math.round(distance * 3)); // Rough estimate
@@ -708,16 +708,16 @@ console.log("emitted ride accepted")
     if (!socket || !driverInfo) return;
 
     const watchId = navigator.geolocation.watchPosition(
-      async (position) => {
-        const location = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        };
-        setCurrentLocation(location);
-        
+        async (position) => {
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setCurrentLocation(location);
+          
         // Get address for the new location
-        await getAddressFromCoordinates(location.lat, location.lng);
-        
+          await getAddressFromCoordinates(location.lat, location.lng);
+          
         // If there's an active ride, update distance
         if (driverInfo.rideStatus?.isActive && driverInfo.rideStatus?.dropLocation) {
           await updateDistanceAndDuration(location, driverInfo.rideStatus.dropLocation);
@@ -729,17 +729,17 @@ console.log("emitted ride accepted")
           driverId: driverInfo._id,
           timestamp: new Date().toISOString()
         });
-      },
-      (error) => {
-        console.error('Location error:', error);
+        },
+        (error) => {
+          console.error('Location error:', error);
         toast.error('Unable to get location');
-      },
-      {
-        enableHighAccuracy: true,
+        },
+        {
+          enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 0
-      }
-    );
+          maximumAge: 0
+        }
+      );
 
     return () => {
       navigator.geolocation.clearWatch(watchId);

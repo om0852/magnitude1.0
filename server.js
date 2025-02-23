@@ -478,6 +478,48 @@ io.on("connection", (socket) => {
     }
   };
 
+  // Add new event handler for trip status updates
+  socket.on("updateTripStatus", (data) => {
+    const { rideId, status, tripDetails } = data;
+    
+    // Find the user socket for this ride
+    const userSocketEntry = Array.from(tripRequests.entries())
+      .find(([_, request]) => request.rideId === rideId);
+
+    if (userSocketEntry) {
+      const userSocket = io.sockets.sockets.get(userSocketEntry[1].userDetails.socketId);
+      if (userSocket) {
+        // Emit status update to user
+        userSocket.emit("tripStatusUpdated", {
+          status,
+          rideId,
+          ...tripDetails
+        });
+      }
+    }
+  });
+
+  // Update completeRide handler
+  socket.on("completeRide", (data) => {
+    const { rideId } = data;
+    
+    // Find the user socket for this ride
+    const userSocketEntry = Array.from(tripRequests.entries())
+      .find(([_, request]) => request.rideId === rideId);
+
+    if (userSocketEntry) {
+      const userSocket = io.sockets.sockets.get(userSocketEntry[1].userDetails.socketId);
+      if (userSocket) {
+        // Emit completion status to user
+        userSocket.emit("tripStatusUpdated", {
+          status: 'completed',
+          rideId,
+          ...userSocketEntry[1]
+        });
+      }
+    }
+  });
+
   socket.on("disconnect", () => {
     // Remove driver data when they disconnect
     driversData.delete(socket.id);

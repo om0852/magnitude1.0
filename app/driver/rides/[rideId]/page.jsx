@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import axios from 'axios';
 import io from 'socket.io-client';
 import toast from 'react-hot-toast';
+import { Web3Integration } from '../../../components/Web3Integration';
 
 const RideDetails = ({ params }) => {
   const { rideId } = use(params);
@@ -284,6 +285,18 @@ const RideDetails = ({ params }) => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Add Web3 Integration */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-semibold mb-4 text-purple-900">Blockchain Payment</h2>
+              <Web3Integration 
+                ride={ride} 
+                onPaymentComplete={() => {
+                  toast.success('Payment processed on blockchain');
+                  fetchRideDetails();
+                }}
+              />
             </div>
 
             {/* Timestamps */}

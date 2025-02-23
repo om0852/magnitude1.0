@@ -8,6 +8,8 @@ import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import io from 'socket.io-client';
 import { useRef } from 'react';
+import { Web3Integration } from '../../components/Web3Integration';
+import { toast } from 'react-hot-toast';
 
 // Dynamically import the Map component with no SSR
 const TripMap = dynamic(() => import('../../components/TripMap'), {
@@ -273,6 +275,25 @@ const LiveStats = styled.div`
       font-weight: 600;
       font-size: 1.125rem;
     }
+  }
+`;
+
+const PaymentSection = styled.div`
+  padding: 2rem;
+  background: #f8f7ff;
+  border-radius: 1rem;
+  margin-top: 1rem;
+  text-align: center;
+
+  h3 {
+    color: #4C1D95;
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  p {
+    color: #6B7280;
+    margin-bottom: 1.5rem;
   }
 `;
 
@@ -635,6 +656,30 @@ export default function TripDetails({ params }) {
             </div>
           </TripStats>
         </Section>
+
+        {trip.status === 'completed' && (
+          <Section>
+            <h2>Payment</h2>
+            <PaymentSection>
+              <h3>Complete Your Payment</h3>
+              <p>Please complete the payment for your ride using MetaMask</p>
+              <Web3Integration 
+                ride={trip}
+                onPaymentComplete={() => {
+                  toast.success('Payment completed successfully!');
+                  // Update trip status to paid
+                  if (socket) {
+                    socket.emit('updateTripStatus', {
+                      rideId: trip.rideId,
+                      status: 'paid',
+                      tripDetails: trip
+                    });
+                  }
+                }}
+              />
+            </PaymentSection>
+          </Section>
+        )}
       </TripCard>
     </PageContainer>
   );
