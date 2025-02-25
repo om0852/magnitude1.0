@@ -1641,7 +1641,7 @@ export default function AccountPage() {
             <form onSubmit={handleContactSubmit} className="space-y-6">
               <div>
                 <label htmlFor="subject" className="block text-sm font-medium text-purple-900 mb-2">
-                  Subject
+                  Subject (Optional)
                 </label>
                 <input
                   type="text"

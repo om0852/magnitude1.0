@@ -52,7 +52,7 @@ export async function POST(request, { params }) {
       rideId,
       driverId: driver._id 
     });
-
+console.log(ride)
     console.log('Found ride:', ride ? {
       rideId: ride.rideId,
       status: ride.status,
@@ -77,7 +77,7 @@ console.log(ride.status)
       storedOtp,
       match: providedOtp === storedOtp
     });
-
+console.log(providedOtp,storedOtp)
     if (providedOtp !== storedOtp) {
       return NextResponse.json(
         { error: 'Invalid OTP provided' },

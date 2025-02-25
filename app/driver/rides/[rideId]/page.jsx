@@ -92,9 +92,21 @@ const RideDetails = ({ params }) => {
       const response = await axios.get(`/api/transactions/${rideId}`);
       if (response.data.success && response.data.data) {
         setTransactionStatus(response.data.data.status);
+        
+        // If transaction is completed, update UI accordingly
+        if (response.data.data.status === 'completed') {
+          toast.success('Payment completed successfully!');
+          // You might want to update ride status or perform other actions here
+        }
       }
     } catch (error) {
       console.error('Error checking transaction status:', error);
+      // Don't show error toast for initial pending status
+      if (error.response?.status !== 404) {
+        toast.error('Failed to check payment status');
+      }
+      // Set status to pending if there's an error
+      setTransactionStatus('pending');
     }
   };
 

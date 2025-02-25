@@ -563,7 +563,6 @@ export default function DriverDashboard() {
         requestId: currentRequest.requestId || `REQ${Date.now()}`,
         userId: currentRequest.userId,
         socketId: currentRequest.socketId,
-        otp:Math.floor(100000 + Math.random() * 900000),
         pickupLocation: {
           lat: parseFloat(currentRequest.pickupLocation.lat),
           lng: parseFloat(currentRequest.pickupLocation.lng),

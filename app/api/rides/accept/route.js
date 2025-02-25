@@ -44,12 +44,16 @@ const rideSchema = new mongoose.Schema({
     required: true
   },
   pickup: {
-    type: Object,
-    required: true
+    lat: Number,
+    lng: Number,
+    address: String,
+    coordinates: [Number]
   },
   destination: {
-    type: Object,
-    required: true
+    lat: Number,
+    lng: Number,
+    address: String,
+    coordinates: [Number]
   },
   status: {
     type: String,
@@ -112,7 +116,7 @@ export async function POST(req) {
     }
 
     // Generate 4-digit OTP
-    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    const otp = Math.floor(1000 + Math.random() * 9000).toString().padStart(4, '0');
 
     // Check if ride already exists
     let ride = await Ride.findOne({ rideId });
@@ -128,6 +132,21 @@ export async function POST(req) {
       ride.userEmail = tripRequest.userDetails.email;
       await ride.save();
     } else {
+      // Format location data
+      const pickupLocation = {
+        lat: parseFloat(tripRequest.pickupLocation.lat),
+        lng: parseFloat(tripRequest.pickupLocation.lng),
+        address: tripRequest.pickupLocation.address,
+        coordinates: [parseFloat(tripRequest.pickupLocation.lng), parseFloat(tripRequest.pickupLocation.lat)]
+      };
+
+      const dropLocation = {
+        lat: parseFloat(tripRequest.dropLocation.lat),
+        lng: parseFloat(tripRequest.dropLocation.lng),
+        address: tripRequest.dropLocation.address,
+        coordinates: [parseFloat(tripRequest.dropLocation.lng), parseFloat(tripRequest.dropLocation.lat)]
+      };
+
       // Create new ride with validated data
       const rideData = {
         rideId,
@@ -136,8 +155,8 @@ export async function POST(req) {
         user: tripRequest.userId,
         userEmail: tripRequest.userDetails.email,
         socketId: tripRequest.socketId,
-        pickup: tripRequest.pickupLocation,
-        destination: tripRequest.dropLocation,
+        pickup: pickupLocation,
+        destination: dropLocation,
         status: 'in_progress',
         distance: tripRequest.distance,
         duration: tripRequest.duration,
